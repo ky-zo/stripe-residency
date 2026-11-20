@@ -1,4 +1,4 @@
-import { onMat, PLAY_SPOTS, STRETCH_MAT, STUDIO_STOOL, SUNBEDS, WATER_Y } from './island-life.js';
+import { onMat, PLAY_SPOTS, STRETCH_MAT, STUDIO_STOOL, SUNBEDS, WATER_Y, YOGA_MATS } from './island-life.js';
 
 const TAU=Math.PI*2;
 
@@ -157,6 +157,12 @@ export function addShoreActivities(T,root,art) {
   piece(f,'#76988a',0,.034,0,.77,.044,1.57);
   for(const z of [-.68,-.62,.62,.68])piece(f,'#c1ccaa',0,.060,z,.74,.010,.027);
   rod(batch,'#94ad99',at(f,-.38,.084,-.74),at(f,.38,.084,-.74),.057);
+  // The class mats face Sandro's. Each has a pale band near either end and a rolled-up back edge.
+  for(const mat of YOGA_MATS){
+    piece(mat,mat.colour,0,.030,0,.70,.040,1.50);
+    for(const z of [-.62,.62])piece(mat,'#efe2c4',0,.052,z,.67,.008,.024);
+    rod(batch,mat.colour,at(mat,-.35,.072,-.72),at(mat,.35,.072,-.72),.050);
+  }
 
   // A second computer sits on the far side of the public seaside table.
   const work=STUDIO_STOOL;

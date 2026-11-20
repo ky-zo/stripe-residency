@@ -1,13 +1,14 @@
 import { DurableObject } from 'cloudflare:workers';
 import { matchingResident, residents } from '../src/residents.js';
 import { SEATS, PLAY_SPOTS, npcLandPose } from '../src/island-life.js';
-import {beachRadius,CLIMBERS_PER_PALM,climbPose,climbSpots,inLagoon,JUMP_MS,jumpLift,movementCredit,shoreActivity,SCOOTER_START,scooterSpot,waterAtCoast,waterEntry} from '../shared/mobility.js';
+import {beachRadius,CLIMBERS_PER_PALM,climbPose,climbSpots,groundHeight,inLagoon,JUMP_MS,SWIM_LEVEL,jumpLift,movementCredit,shoreActivity,SCOOTER_START,scooterSpot,waterAtCoast,waterEntry} from '../shared/mobility.js';
 import { activityId, activitySeat, climbKey, climbSlot } from '../shared/activities.js';
 import { ballAt, colors, initialBall } from '../shared/ball.js';
 import { acceptsRoomPass, hasInvitation, invitationCookie, invitationPage } from '../shared/invitations.js';
 
 import {memberDetails} from '../shared/members.js';
-import {BOAT_START, BOULDER, PADEL, SURF, SURF_BOOST_MS, isBoatSeat, boatSpot, boulderPose, canReturnPadel, courtEntry, courtSide, floatable, newPadelShot, onCourt, otherSide, padelBallAt, stepOffBoat, surfEntry} from '../shared/sports.js';
+import {COURT_SLOTS, BOAT_START, BOULDER, PADEL, SURF, SUMMIT, SURF_BOOST_MS, LEAP_REACH, isBoatSeat, boatSpot, boulderPose, canReturnPadel, clearOfBoulder, courtEntry, courtSide, floatable, newPadelShot, onCourt, onSummit, otherSide, padelBallAt, stepOffBoat, summitFloor, surfEntry} from '../shared/sports.js';
+import {DOG_NAMES, DOG_REACH, HELD_TURN, dogPose} from '../shared/dogs.js';
 
 // Keep retired public identifiers out of guest cards without publishing those identifiers.
 const retiredWords=new Set([0xf0085011,0xaeb237ed,0xc1f4b8d1,0xe63cf52a]);
@@ -28,7 +29,7 @@ const limit=64;
 const signed=(v)=>Math.round(v*100)/100;
 const finite=(...nums)=>nums.every(Number.isFinite);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
-const publicPlayer=p=>({id:p.id,memberId:p.guest?.id||null,handle:p.handle,color:p.color,x:p.x,z:p.z,yaw:p.yaw,walking:p.walking,at:p.lastMove,seat:p.seat,waveAt:p.waveAt,jumpAt:p.jumpAt||0,progress:p.progress||0,strokeAt:p.strokeAt||0});
+const publicPlayer=p=>({id:p.id,memberId:p.guest?.id||null,handle:p.handle,color:p.color,x:p.x,z:p.z,yaw:p.yaw,walking:p.walking,at:p.lastMove,seat:p.seat,waveAt:p.waveAt,jumpAt:p.jumpAt||0,progress:p.progress||0,strokeAt:p.strokeAt||0,rest:Boolean(p.rest),from:p.from||null});
 const send=(ws,msg)=>{try{ws.send(JSON.stringify(msg));}catch{}};
 const localHost=url=>['127.0.0.1','localhost','[::1]'].includes(url.hostname);
 export default {
@@ -77,6 +78,7 @@ export class Courtyard extends DurableObject {
     });
     this.sockets=new Map();
     this.boat={...BOAT_START};this.boatVacatedAt=0;this.court={shot:null,best:0};this.courtTimer=null;
+    this.dogs=Object.fromEntries(DOG_NAMES.map(name=>[name,{holder:null,drop:null}]));
     for(const ws of ctx.getWebSockets()){
       // Release sockets attached by the previous hibernating room.
       try{ws.serializeAttachment(null);ws.close(1001,'Reconnect to the island');}catch{}
@@ -109,13 +111,23 @@ export class Courtyard extends DurableObject {
       if(p.handle)claims[p.handle]=p.id;
       if(p.guest)members.push(p.guest);
     }
-    return {players,claims,members,ball:this.ball,scooter:this.scooter,boat:this.boat,court:this.court,serverTime:Date.now()};
+    return {players,claims,members,ball:this.ball,scooter:this.scooter,boat:this.boat,court:this.court,dogs:this.dogs,serverTime:Date.now()};
   }
   occupied(field,value,except){
     for(const {p} of this.sockets.values())if(p&&p!==except&&p[field]===value)return true;
     return false;
   }
   changed(){this.broadcast({type:'state',...this.state()});}
+  dogHeldBy(p){return DOG_NAMES.find(name=>this.dogs[name].holder===p.id)||null;}
+  // A carried dog is set down beside its holder, or at their feet when they sit, start an activity or leave.
+  releaseDog(p,now,spot=null){
+    const name=this.dogHeldBy(p);
+    if(!name)return false;
+    const beside=spot&&finite(spot.x,spot.z)&&dist(spot,p)<=1.2&&inLagoon(spot.x,spot.z)&&groundHeight(spot.x,spot.z)>=SWIM_LEVEL-.3;
+    const at=beside?spot:p,yaw=(p.yaw||0)+HELD_TURN;
+    this.dogs[name]={holder:null,drop:{x:signed(at.x),z:signed(at.z),yaw:signed(Math.atan2(Math.sin(yaw),Math.cos(yaw))),at:now}};
+    return true;
+  }
   playSpot(id,key){
     if(id==='boat')return boatSpot(this.boat);
     if(id==='boulder')return BOULDER;
@@ -129,16 +141,18 @@ export class Courtyard extends DurableObject {
     this.scooter={x,z,yaw};
     this.sql.exec('INSERT OR REPLACE INTO toys (id,pose) VALUES (2,?)',JSON.stringify(this.scooter));
   }
+  // How many players stand on one half of the padel court.
+  onSide(side){return [...this.sockets.values()].filter(s=>courtSide(s.p?.seat)===side).length;}
   courtClock(){
     clearTimeout(this.courtTimer);
     const shot=this.court.shot;if(!shot)return;
-    const occupied=this.occupied('seat','play:padel:'+shot.target);
+    const occupied=this.onSide(shot.target)>0;
     const end=shot.start+shot.duration*(occupied?1.35:1);
     this.courtTimer=setTimeout(()=>{
       if(this.court.shot!==shot)return;
-      const now=Date.now(),hasReceiver=this.occupied('seat','play:padel:'+shot.target);
+      const now=Date.now(),hasReceiver=this.onSide(shot.target)>0;
       if(hasReceiver&&now<shot.start+shot.duration*1.35){this.courtClock();return;}
-      if(!hasReceiver&&this.occupied('seat','play:padel:'+otherSide(shot.target))){
+      if(!hasReceiver&&this.onSide(otherSide(shot.target))>0){
         const ball=padelBallAt(shot,end);
         this.court.shot=newPadelShot(ball.x,ball.z,shot.target,now,shot.rally,{practice:true});
       }else this.court.shot=null;
@@ -162,6 +176,14 @@ export class Courtyard extends DurableObject {
   dismount(p,exit){
     const id=activityId(p.seat);
     this.releaseSport(p);
+    p.rest=false;
+    if(id==='summit'){
+      // Jumping down lands on open sand beside the rock. Everyone sees the leap from the top.
+      const open=exit&&finite(exit.x,exit.z)&&clearOfBoulder(exit.x,exit.z)&&dist(exit,p)<=LEAP_REACH&&inLagoon(exit.x,exit.z)&&!shoreActivity(null,exit.x,exit.z);
+      const land=open?exit:BOULDER.land,from={x:p.x,y:signed(summitFloor(p.x,p.z)),z:p.z};
+      Object.assign(p,{x:signed(land.x),z:signed(land.z),yaw:signed(Math.atan2(land.x-p.x,land.z-p.z)),seat:null,progress:0,walking:false,jumpAt:Date.now(),from});
+      return;
+    }
     if(id==='boat'||id==='surf'){
       const landing=id==='boat'?stepOffBoat(this.boat):p;
       const swimming=shoreActivity('swim',landing.x,landing.z)==='swim';
@@ -178,7 +200,8 @@ export class Courtyard extends DurableObject {
     }else{
       const spot=this.playSpot(id,climbKey(p.seat)),seat=seatById(p.seat);
       if(spot)Object.assign(p,spot.land);
-      if(seat)Object.assign(p,{x:signed(seat.x-Math.sin(seat.facing)*.7),z:signed(seat.z-Math.cos(seat.facing)*.7),yaw:seat.facing+Math.PI});
+      const step=seat?.approach||seat&&{x:seat.x-Math.sin(seat.facing)*.7,z:seat.z-Math.cos(seat.facing)*.7};
+      if(seat)Object.assign(p,{x:signed(step.x),z:signed(step.z),yaw:seat.facing+Math.PI});
     }
     p.seat=null;p.walking=false;p.progress=0;p.jumpAt=0;
   }
@@ -210,7 +233,7 @@ export class Courtyard extends DurableObject {
     if(msg.type==='move'){
       if(!finite(msg.x,msg.z,msg.yaw))return;
       const id=activityId(p.seat),elapsed=(now-p.lastMove)/1000;
-      if(p.seat!==null&&!['swim','ride','climb','boulder','surf','boat','padel'].includes(id)||p.seat==='play:boat:bow')return;
+      if(p.seat!==null&&!['swim','ride','climb','boulder','surf','boat','padel','summit'].includes(id)||p.seat==='play:boat:bow')return;
       let pose={x:msg.x,z:msg.z,yaw:msg.yaw},progress=0,nextActivity=id,credit;
       const balance=session.motionSeat===p.seat?session.motionCredit:null;
       if(id==='climb'||id==='boulder'){
@@ -220,6 +243,9 @@ export class Courtyard extends DurableObject {
           send(ws,{type:'correct',player:publicPlayer(p)});return;
         }
         progress=msg.progress;pose=id==='boulder'?boulderPose(progress):climbPose(spot,progress,climbSlot(p.seat));
+      }else if(id==='summit'){
+        credit=movementCredit(balance,elapsed,3.2,dist(msg,p));
+        if(p.rest||!onSummit(msg.x,msg.z)||credit===null){send(ws,{type:'correct',player:publicPlayer(p)});return;}
       }else{
         const speed={ride:8.8,swim:4.8,boat:10,surf:now-(p.strokeAt||0)<SURF_BOOST_MS+350?8.8:6.4,padel:5}[id]||6.1;
         credit=movementCredit(balance,elapsed,speed,dist(msg,p));
@@ -233,6 +259,7 @@ export class Courtyard extends DurableObject {
       session.motionCredit=credit;session.motionSeat=p.seat;
       Object.assign(p,{x:signed(pose.x),z:signed(pose.z),yaw:signed(Math.atan2(Math.sin(pose.yaw),Math.cos(pose.yaw))),progress,walking:msg.walking===true,lastMove:now});
       if(nextActivity!==id){
+        if(nextActivity==='swim')this.releaseDog(p,now);
         p.seat=nextActivity==='swim'?activitySeat('swim',p.id):null;p.jumpAt=0;
         if(id==='ride')this.parkScooter(SCOOTER_START);
         this.changed();return;
@@ -252,15 +279,15 @@ export class Courtyard extends DurableObject {
         }
         if(now-(p.strokeAt||0)<350)return;
         const ball=shot?padelBallAt(shot,now):p;
-        const solo=!this.occupied('seat','play:padel:'+otherSide(side));
+        const solo=!this.onSide(otherSide(side));
         this.court.shot=newPadelShot(ball.x,ball.z,side,now,(shot?.rally||0)+1,{toWall:solo});
         this.court.best=Math.max(this.court.best,this.court.shot.rally);p.strokeAt=now;this.courtClock();
       }else return;
       this.changed();return;
     }
     if(msg.type==='jump'){
-      if(p.seat!==null||now-(p.jumpAt||0)<JUMP_MS+70)return;
-      p.jumpAt=now;this.broadcast({type:'jump',id:p.id,at:now});return;
+      if(p.seat!==null&&activityId(p.seat)!=='summit'||p.rest||now-(p.jumpAt||0)<JUMP_MS+70)return;
+      p.jumpAt=now;p.from=null;this.broadcast({type:'jump',id:p.id,at:now});return;
     }
     if(msg.type==='saveMember'||msg.type==='removeMember'){
       reject('member','Refresh the island to join as a guest for this visit.');return;
@@ -280,7 +307,7 @@ export class Courtyard extends DurableObject {
       if(!handles.includes(msg.handle))return;
       if(this.occupied('handle',msg.handle,p)){reject('taken','Someone else is already playing this resident.');send(ws,{type:'state',...this.state()});return;}
       if(p.handle!==msg.handle){
-        this.dismount(p);
+        this.releaseDog(p,now);this.dismount(p);
         const pose=npcLandPose(handles.indexOf(msg.handle),now);
         Object.assign(p,{handle:msg.handle,seat:null,x:signed(pose.x),z:signed(pose.z),yaw:signed(pose.yaw),walking:false,lastMove:now});
       }
@@ -290,7 +317,8 @@ export class Courtyard extends DurableObject {
       const seat=seatById(msg.seat);
       if(!seat||p.seat!==null||dist(p,seat)>2.8){reject('seat','Walk up to an open seat first.');return;}
       if(this.occupied('seat',String(seat.id),p)){reject('seat','Someone just sat there. Try another seat.');return;}
-      Object.assign(p,{seat:String(seat.id),x:seat.x,z:seat.z,yaw:seat.facing,walking:false});
+      this.releaseDog(p,now);
+      Object.assign(p,{seat:String(seat.id),x:seat.x,z:seat.z,yaw:seat.facing,walking:false,from:null});
     }else if(msg.type==='activity'){
       const spot=this.playSpot(msg.id,msg.key);
       // Tabs loaded before depth-based movement still send a separate beach-entry request.
@@ -299,12 +327,14 @@ export class Courtyard extends DurableObject {
       if(!spot||(p.seat!==null&&!fromWater)||(!coastline&&dist(p,spot.land)>2.8)){reject('activity','Move a little closer to the activity.');return;}
       let key=spot.key;
       if(spot.id==='boat')key=this.occupied('seat','play:boat:helm')?'bow':'helm';
-      if(spot.id==='padel')key=this.occupied('seat','play:padel:south')?'north':'south';
+      // Fill the emptier half first, south on a tie, then take the free spot on it.
+      if(spot.id==='padel')key=this.onSide('north')<this.onSide('south')?'north':'south';
       let seat=activitySeat(spot.id,p.id,key);
+      for(let slot=1;spot.id==='padel'&&slot<COURT_SLOTS&&this.occupied('seat',seat,p);slot++)seat=activitySeat('padel',p.id,key,slot);
       // Climbers share a palm from different sides of the trunk.
       for(let slot=1;spot.id==='climb'&&slot<CLIMBERS_PER_PALM&&this.occupied('seat',seat,p);slot++)seat=activitySeat('climb',p.id,key,slot);
       if(this.occupied('seat',seat,p)){
-        if(['boulder','boat','padel'].includes(spot.id)){reject('activity',{boulder:'Someone is on the boulder.',boat:'Both canoe seats are taken.',padel:'Two players are already on court.'}[spot.id]);return;}
+        if(['boulder','boat','padel'].includes(spot.id)){reject('activity',{boulder:'Someone is on the boulder.',boat:'Both canoe seats are taken.',padel:'Four players are already on court.'}[spot.id]);return;}
         reject('activity',spot.id==='ride'?'Someone is riding the motorbike.':spot.id==='climb'?'This palm is full. Try another tree.':'The sunbed is occupied.');return;
       }
       let origin=spot.land;
@@ -313,10 +343,31 @@ export class Courtyard extends DurableObject {
       else if(spot.id==='climb')origin=climbPose(spot,0,climbSlot(seat));
       else if(spot.id==='boulder')origin=boulderPose(0);
       else if(spot.id==='surf')origin=surfEntry([...this.sockets.values()].map(s=>s.p).filter(Boolean));
-      else if(spot.id==='padel')origin=courtEntry(key);
-      Object.assign(p,{x:origin.x,z:origin.z,yaw:origin.yaw,seat,progress:0,strokeAt:0,jumpAt:0,walking:false,lastMove:now});
+      else if(spot.id==='padel')origin=courtEntry(key,seat.split(':')[3]?1:0);
+      this.releaseDog(p,now);
+      Object.assign(p,{x:origin.x,z:origin.z,yaw:origin.yaw,seat,progress:0,strokeAt:0,jumpAt:0,walking:false,lastMove:now,rest:false,from:null});
       if(spot.id==='padel')this.courtClock();
       if(spot.id==='boat')this.boatVacatedAt=0;
+    }else if(msg.type==='summit'){
+      if(p.seat!=='play:boulder'||(p.progress||0)<.99){reject('activity','Climb to the top of the boulder first.');return;}
+      const up=[...this.sockets.values()].filter(s=>activityId(s.p?.seat)==='summit').length;
+      if(up>=SUMMIT.capacity){reject('summit','The top of the boulder is full. Climb down or wait a moment.');return;}
+      const top=boulderPose(1);
+      Object.assign(p,{seat:activitySeat('summit',p.id),x:signed(top.x),z:signed(top.z),yaw:signed(top.yaw),progress:0,rest:false,jumpAt:0,from:null,walking:false,lastMove:now});
+    }else if(msg.type==='rest'){
+      const rest=msg.on===true;
+      if(activityId(p.seat)!=='summit'||rest===Boolean(p.rest))return;
+      p.rest=rest;p.walking=false;p.lastMove=now;
+    }else if(msg.type==='dog'){
+      if(!DOG_NAMES.includes(msg.name))return;
+      const dog=this.dogs[msg.name];
+      if(msg.hold===true){
+        if(dog.holder===p.id)return;
+        if(dog.holder){reject('dog','Someone else is carrying '+msg.name+'.');send(ws,{type:'state',...this.state()});return;}
+        if(p.seat!==null||this.dogHeldBy(p))return;
+        if(dist(dogPose(msg.name,dog,now),p)>DOG_REACH+.9){reject('dog','Walk a little closer to '+msg.name+'.');return;}
+        this.dogs[msg.name]={holder:p.id,drop:null};
+      }else if(dog.holder!==p.id||!this.releaseDog(p,now,msg.spot))return;
     }else if(msg.type==='stand'){
       this.dismount(p,msg.exit);p.lastMove=now;
     }else if(msg.type==='wave'){
@@ -343,6 +394,7 @@ export class Courtyard extends DurableObject {
     if(!session)return;
     this.sockets.delete(ws);
     if(!session.p)return;
+    this.releaseDog(session.p,Date.now());
     this.releaseSport(session.p);
     if(![...this.sockets.values()].some(s=>s.p)){this.boat={...BOAT_START};this.court.best=0;}
     if(activityId(session.p.seat)==='ride')this.parkScooter(session.p);

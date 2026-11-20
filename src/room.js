@@ -72,11 +72,11 @@ export function createRoom(events) {
       syncTime(m.serverTime);
       if(m.type==='welcome'){
         clearTimeout(admissionTimer);tries=0;
-        state={status:'online',ownId:m.id,players:m.players,claims:m.claims,members:m.members||[],ball:m.ball,scooter:m.scooter,boat:m.boat,court:m.court};
+        state={status:'online',ownId:m.id,players:m.players,claims:m.claims,members:m.members||[],ball:m.ball,scooter:m.scooter,boat:m.boat,court:m.court,dogs:m.dogs||{}};
         lastSent=null;lastSendAt=0;syncGuest();events.state(state,true);sendGuest();
         clearInterval(heartbeat);heartbeat=setInterval(()=>send({type:'ping'}),18000);
       }else if(m.type==='state'){
-        state={...state,players:m.players,claims:m.claims,members:m.members||[],ball:m.ball,scooter:m.scooter,boat:m.boat,court:m.court};syncGuest();events.state(state);
+        state={...state,players:m.players,claims:m.claims,members:m.members||[],ball:m.ball,scooter:m.scooter,boat:m.boat,court:m.court,dogs:m.dogs||{}};syncGuest();events.state(state);
       }else if(m.type==='guestResult'){
         const request=pendingGuest;
         if(!request||request.op!==m.op)return;
@@ -90,7 +90,7 @@ export function createRoom(events) {
         }
         events.move?.(m);
       }else if(m.type==='jump'){
-        const who=state.players.find(p=>p.id===m.id);if(who)who.jumpAt=m.at;
+        const who=state.players.find(p=>p.id===m.id);if(who){who.jumpAt=m.at;who.from=null;}
       }else if(m.type==='wave'){
         const who=state.players.find(p=>p.id===m.id);if(who)who.waveAt=m.at;events.wave(m);
       }else if(m.type==='ball'){state.ball=m.ball;events.ball(m.ball);}

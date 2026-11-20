@@ -741,7 +741,33 @@ function buildPieces(studio,look,expression) {
 
 const guestHair={short:'swept',wavy:'parted',long:'layered',buzz:'shaved'};
 const activities=new Set(['lounge','swim','read','work','stretch','photograph','climb','ride','jump',
-  'surf','boat','boat-passenger','boulder','padel']);
+  'surf','boat','boat-passenger','boulder','padel','perch','bench','yoga']);
+
+// A slow flow the whole class shares on the room clock. Each pose is held, then eased into the next.
+// hinge folds the body forward at the hips and turn swings it side-on to the mat. legs hold
+// [thigh x, thigh z, shin x, shin z] for each limb, and hands are targets in the body's own frame.
+const yogaPose=({hinge=0,turn=0,shift=0,drop=0,head=[0,0],calm=0,legs=[[0,-.02,0,0],[0,.02,0,0]],hands})=>({hinge,turn,shift,drop,head,calm,legs,hands});
+const yogaPoses={
+  namaste:yogaPose({head:[.08,0],calm:1,hands:[[-.03,.86,.22],[.03,.86,.22]]}),
+  reach:yogaPose({hinge:-.11,head:[-.24,0],hands:[[-.11,1.62,-.03],[.11,1.62,-.03]]}),
+  fold:yogaPose({hinge:1.22,head:[.30,0],hands:[[-.16,.69,.40],[.16,.69,.40]]}),
+  warriorRight:yogaPose({turn:Math.PI/2,drop:.06,head:[0,-1.15],legs:[[0,-.86,0,.86],[0,.40,0,0]],hands:[[-.86,.84,0],[.86,.84,0]]}),
+  warriorLeft:yogaPose({turn:-Math.PI/2,drop:.06,head:[0,1.15],legs:[[0,-.40,0,0],[0,.86,0,-.86]],hands:[[-.86,.84,0],[.86,.84,0]]}),
+  // Balance on one leg with the other foot pressed to the inside of the standing calf.
+  tree:yogaPose({shift:-.035,head:[.04,0],calm:1,legs:[[0,-.03,0,0],[-.30,1.05,0,-2.0]],hands:[[-.035,1.60,.03],[.035,1.60,.03]]}),
+};
+const yogaFlow=['namaste','reach','fold','reach','warriorRight','warriorLeft','reach','tree'].map(name=>yogaPoses[name]);
+const YOGA_HOLD=4.6,YOGA_EASE=1.5;
+function yogaAt(t,out) {
+  const step=YOGA_HOLD+YOGA_EASE,length=step*yogaFlow.length,at=((t%length)+length)%length,k=Math.floor(at/step);
+  const u=Math.min(1,Math.max(0,(at-k*step-YOGA_HOLD)/YOGA_EASE)),w=u*u*(3-2*u);
+  const a=yogaFlow[k],b=yogaFlow[(k+1)%yogaFlow.length],mix=(p,q)=>p+(q-p)*w;
+  for(const key of ['hinge','turn','shift','drop','calm'])out[key]=mix(a[key],b[key]);
+  out.head=[mix(a.head[0],b.head[0]),mix(a.head[1],b.head[1])];
+  out.legs=a.legs.map((leg,i)=>leg.map((v,j)=>mix(v,b.legs[i][j])));
+  out.hands=a.hands.map((hand,i)=>hand.map((v,j)=>mix(v,b.hands[i][j])));
+  return out;
+}
 
 // The origin is the lower hand. The long blade can reach the water from either bench.
 function drawCanoePaddle(p) {
@@ -882,6 +908,7 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
   const signature=keepsakePoses[look.prop];
   const contextProps=new Map();
   let palm=null,lastActivity='';
+  const yoga={};
   function aimHand(limb,x,y,z,weight=1) {
     aim.set(x-limb.arm.position.x,y-limb.arm.position.y,z-limb.arm.position.z).normalize();
     rotation.setFromUnitVectors(limb.armDirection,aim);
@@ -925,11 +952,13 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
   let walkWeight=0,seatWeight=0,previousTime,jumpStart=0;
   let travelPhase=hash%2<1?.85:Math.PI+.85;
   let paddlePhase=.23,forehandStart=-Infinity,padelPressed=false;
-  function animate(time=0,walking=false,seated=false,wave=0,activity='',progress=0) {
+  function animate(time=0,walking=false,seated=false,wave=0,activity='',progress=0,holding=false) {
     activity=activities.has(activity)?activity:'';
     if(activity==='jump'&&lastActivity!=='jump') jumpStart=time;
     if(activity==='padel'&&lastActivity!=='padel') {forehandStart=-Infinity;padelPressed=false;}
     changeActivity(activity);
+    // Arms full of dog: the keepsake waits until they are free again.
+    if(clearProp&&!activity) clearProp.visible=!holding;
     const bouldering=activity==='boulder',climbing=activity==='climb'||bouldering;
     const riding=activity==='ride',jumping=activity==='jump',surfing=activity==='surf';
     const paddling=activity==='boat',boating=paddling||activity==='boat-passenger',padel=activity==='padel';
@@ -938,7 +967,8 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
     const stand=topOut?T.MathUtils.smoothstep(topOut,.80,.995):0;
     const crouch=mantle*(1-stand);
     const traveling=climbing||riding;
-    const sitting=boating||(seated&&!traveling&&!jumping&&!surfing&&!padel)||activity==='read'||activity==='work'||activity==='lounge';
+    const perched=activity==='perch';
+    const sitting=boating||perched||activity==='bench'||(seated&&!traveling&&!jumping&&!surfing&&!padel)||activity==='read'||activity==='work'||activity==='lounge';
     const delta=previousTime===undefined?1:Math.max(0,Math.min(.16,time-previousTime));
     previousTime=time;
     const ease=1-Math.exp(-delta*15);
@@ -999,6 +1029,19 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
     } else if(activity==='photograph') {
       head.rotation.x=.103+.045*Math.sin(time*1.4+hash);
       head.rotation.z-=.07;
+    } else if(activity==='yoga') {
+      // Students follow the teacher a beat behind. The hips stay put while the body folds over them.
+      yogaAt(time-(hash%1)*.35,yoga);
+      const h=yoga.hinge;
+      pose.rotation.set(h+.010*breath,yoga.turn,0);
+      pose.position.set(yoga.shift,.5-.5*Math.cos(h)-yoga.drop+.003*breath,-.5*Math.sin(h));
+      head.rotation.x=yoga.head[0]+.012*breath;head.rotation.y=yoga.head[1];
+    } else if(perched) {
+      // Hips on the stone and legs out in front, leaning back a little to take in the view.
+      pose.position.set(0,-.405+.003*breath,-.02);
+      pose.rotation.set(-.13,0,0);
+      head.rotation.x=.07+.018*breath;
+      head.rotation.y=.34*Math.sin(time*.37+hash);
     } else if(climbing) {
       pose.position.set(.024*stridePhase,.031+.012*walkWeight*Math.cos(2*travelPhase),.027);
       pose.rotation.set(-.058,.038*stridePhase,-.052*stridePhase);
@@ -1058,7 +1101,7 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
     }
     if(traveling||paddling||padel) poseInverse.copy(pose.quaternion).invert();
     const blink=(time+hash)%(4.2+(hash%1.5));
-    const resting=activity==='lounge';
+    const resting=activity==='lounge'||activity==='yoga'&&yoga.calm>.5;
     const delighted=greeting>.71||(jumping&&airborne>.25&&airborne<.74);
     eyes.geometry=resting?pieces.sleep:delighted?pieces.happy:pieces.eyes;
     eyes.scale.y=(resting||delighted)?1:blink<.17?.11+.89*Math.min(1,Math.abs(blink-.085)/.065):1;
@@ -1090,6 +1133,21 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
       } else if(activity==='lounge') {
         thigh.rotation.x=-.57;shin.rotation.x=.12;
         aimHand(limb,side*.20,.593,.119);
+      } else if(activity==='bench') {
+        // Off duty on a bench: hands rest on the knees instead of reaching for a keyboard.
+        arm.scale.y=1.1;
+        aimHand(limb,side*.15,.58+.004*breath,.24);
+      } else if(perched) {
+        thigh.rotation.x=-1.38+side*.04;thigh.rotation.z=side*.09;
+        shin.rotation.x=.16+.06*Math.max(0,Math.sin(time*.8+side*2.1+hash));
+        arm.scale.y=1.16;
+        aimHand(limb,side*.15,.55,.19);
+      } else if(activity==='yoga') {
+        const leg=yoga.legs[side<0?0:1],hand=yoga.hands[side<0?0:1];
+        thigh.rotation.x=leg[0]-yoga.hinge;thigh.rotation.z=leg[1];
+        shin.rotation.x=leg[2];shin.rotation.z=leg[3];
+        arm.scale.y=1.12;
+        aimHand(limb,hand[0],hand[1],hand[2]);
       } else if(activity==='stretch') {
         thigh.rotation.z=side*.14;
         arm.scale.y=1.25;
@@ -1165,6 +1223,11 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
         if(side<0) grip(limb,-.319-.079*windup+.322*follow,
           .682+.047*windup+.192*follow,.155-.166*windup+.227*contact+.105*follow);
         else aimHand(limb,.303+.048*windup+.054*follow,.714+.075*contact,.206-.136*follow);
+      }
+      if(holding&&!traveling&&!surfing&&!boating&&!padel&&activity!=='swim') {
+        // Both forearms cradle the dog against the chest.
+        arm.scale.y=1.18;
+        aimHand(limb,side*.13,.66+.010*Math.sin(time*8.8+hash)*walkWeight,.26);
       }
       if(side<0 && greeting>0) {
         // Trace a broad arc around the shoulder while keeping the open palm raised.

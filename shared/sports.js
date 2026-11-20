@@ -12,6 +12,35 @@ export function boulderPose(progress){
   const [x,y,z]=boulderSteps[i],next=boulderSteps[i+1];
   return {x:x+(next[0]-x)*s,y:y+(next[1]-y)*s,z:z+(next[2]-z)*s,yaw:Math.PI,pitch:-.055*(1-progress),roll:0};
 }
+// The boulder's rounded top. Climbers who top out can walk, sit and hop up here, then jump down.
+export const SUMMIT={id:'summit',label:'Top of the boulder',x:12.12,z:-4.62,rx:.50,rz:.46,y:2.284,capacity:3};
+export const summitRadius=(x,z)=>Math.hypot((x-SUMMIT.x)/SUMMIT.rx,(z-SUMMIT.z)/SUMMIT.rz);
+export const onSummit=(x,z)=>summitRadius(x,z)<=1.0001;
+export const summitFloor=(x,z)=>SUMMIT.y-.014*Math.min(1,summitRadius(x,z))**2;
+export function clampToSummit(x,z){
+  const r=summitRadius(x,z);
+  return r<=1?{x,z}:{x:SUMMIT.x+(x-SUMMIT.x)/r,z:SUMMIT.z+(z-SUMMIT.z)/r};
+}
+// The rock and its crash pads, as an ellipse on the sand. Jumpers land outside it.
+const footprint=(x,z)=>Math.hypot((x-12.01)/1.45,(z+4.49)/1.29);
+export const clearOfBoulder=(x,z)=>footprint(x,z)>=1.15;
+export const LEAP_REACH=3.1;
+// Jump the way the climber faces, or the nearest open way round, to the first sand they can stand on.
+export function leapFrom(from,yaw,canLand){
+  for(let k=0;k<16;k++){
+    const turn=Math.ceil(k/2)*.4*(k%2?1:-1),a=yaw+turn,dx=Math.sin(a),dz=Math.cos(a);
+    for(let d=.4;d<=LEAP_REACH-.1;d+=.05){
+      const x=from.x+dx*d,z=from.z+dz*d;
+      if(footprint(x,z)>=1.2&&canLand(x,z))return {x,z,yaw:a};
+    }
+  }
+  return null;
+}
+// A short rise, then a fall onto the sand. Takes JUMP_MS, like any other jump.
+export function leapPose(from,to,t){
+  const s=clamp(t,0,1);
+  return {x:from.x+(to.x-from.x)*s,y:from.y+(to.y-from.y)*s+2.8*s*(1-s),z:from.z+(to.z-from.z)*s};
+}
 export function surfEntry(players){
   for(let row=0;row<=players.length;row++){
     for(const lane of [0,1,-1,2,-2]){
@@ -23,11 +52,18 @@ export function surfEntry(players){
 }
 export const boatSpot=pose=>({id:'boat',label:'Outrigger canoe',x:pose.x,z:pose.z,hitY:.13,land:pose});
 export const isBoatSeat=seat=>seat==='play:boat:helm'||seat==='play:boat:bow';
-export const courtSide=seat=>seat==='play:padel:north'?'north':seat==='play:padel:south'?'south':null;
+// Up to two players a side. `play:padel:south` and `play:padel:south:1` both stand on the south half.
+export const COURT_SLOTS=2;
+export function courtSide(seat){
+  if(typeof seat!=='string'||!seat.startsWith('play:padel:'))return null;
+  const side=seat.split(':')[2];
+  return side==='north'||side==='south'?side:null;
+}
 export const otherSide=side=>side==='south'?'north':'south';
 export const sideSign=side=>side==='north'?-1:1;
 export const onCourt=(x,z,side)=>Math.abs(x-PADEL.x)<=1.96&&(z-PADEL.z)*sideSign(side)>=.50&&(z-PADEL.z)*sideSign(side)<=3.30;
-export const courtEntry=side=>({x:PADEL.x,z:PADEL.z+sideSign(side)*2.30,yaw:side==='south'?Math.PI:0});
+// A partner joins beside whoever already holds that half.
+export const courtEntry=(side,slot=0)=>({x:PADEL.x+(slot?.95*sideSign(side):0),z:PADEL.z+sideSign(side)*2.30,yaw:side==='south'?Math.PI:0});
 export const floatable=(x,z)=>inLagoon(x,z)&&groundHeight(x,z)<=SWIM_LEVEL-.09;
 export function stepOffBoat(boat){
   const {x,z,yaw}=boat;

@@ -422,7 +422,8 @@ function puppy(T, pattern, corgi) {
     });
   }
   animate(0, false);
-  return { name, root, animate, labelHeight: corgi ? .53 : .66 };
+  // Where the root sits, above and ahead of a holder's feet, so the belly rests on their forearms.
+  return { name, root, animate, labelHeight: corgi ? .53 : .66, hold: corgi ? { y: .63, z: .25 } : { y: .57, z: .29 } };
 }
 
 // Both ground pivots sit between the four paws. Local forward is +Z.

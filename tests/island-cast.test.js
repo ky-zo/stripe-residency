@@ -24,7 +24,7 @@ test('both small island dogs run the same dry paths for every visitor',()=>{
     assert.ok(initial.max.y>.35&&initial.max.y<.90);
     let moving=false,paused=false;
     const other={name:dog.name,root:new T.Group(),animate(_seconds,run){if(run)moving=true;else paused=true;}};
-    const update=createDogRun(T,dog),replay=createDogRun(T,other),bounds=new T.Box3();
+    const update=createDogRun(dog),replay=createDogRun(other),bounds=new T.Box3();
     for(let ms=0;ms<60000;ms+=310){
       const time=1700000000000+ms;update(time);replay(time);
       assert.ok(dog.root.position.distanceTo(other.root.position)<.00001);

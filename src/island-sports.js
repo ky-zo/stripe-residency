@@ -43,5 +43,5 @@ export const sportObstacles=[
     {x:PADEL.x,z:PADEL.z+3.60*side,w:4.60,d:.12},
     {x:PADEL.x-2.30,z:PADEL.z+2.37*side,w:.12,d:2.46}
   ]),
-  {x:PADEL.x,z:PADEL.z,w:4.6,d:.09},
+  {x:PADEL.x,z:PADEL.z,w:4.6,d:.09,h:.95},
 ];

@@ -1,5 +1,5 @@
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { onMat, SEATS, WATER_Y, WORK_DESKS, WORK_MATS } from './island-life.js';
+import { COURT_BENCH, onMat, SEATS, WATER_Y, WORK_DESKS, WORK_MATS } from './island-life.js';
 import { BEACH_PROFILE, PALMS, beachRadius, palmTrunk, shoreline } from '../shared/mobility.js';
 import { PADEL } from '../shared/sports.js';
 import { addShoreActivities } from './shore-art.js';
@@ -337,7 +337,8 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
     batch.stamp(props.pipe, tone, x, y, z, radius, height, zRadius);
   const obstacles = [];
   const animated = [];
-  const obstacle = (x, z, w, d) => obstacles.push({ x, z, w, d });
+  // h is the top of the obstacle. A jump clears anything lower than the jumper's feet; the rest stays solid.
+  const obstacle = (x, z, w, d, h = Infinity) => obstacles.push({ x, z, w, d, h });
   const palette = {
     darkLeaf: '#37694b', green: '#558457', young: '#91a95d',
     deep: '#254d42', teal: '#44857a', ink: '#243f36',
@@ -347,6 +348,9 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
 
   scene.background = new T.Color('#d4e6df');
   scene.fog = new T.FogExp2('#d1e1d8', 0.009);
+  const clearSky = scene.background.clone(), clearHaze = scene.fog.color.clone();
+  const showerSky = new T.Color('#a9b9b8'), showerHaze = new T.Color('#aebdbb');
+  let weather = 0;
   const sky = new T.HemisphereLight('#fffaed', '#e6d3ba', 1.67);
   const sunlight = new T.DirectionalLight('#fff1db', 2.14);
   sunlight.position.set(-8, 15, 7.8);
@@ -891,15 +895,15 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
     flower(details,vaseX,1.34,vaseZ-.03,.094);
     stool(x,z+1.05,mint ? '#6d937a' : '#d1905c');
     stool(x-.75,z-.90,'#a67e51');
-    obstacle(x,z,width,depth);
-    obstacle(x-.75,z-.90,.51,.44);
+    obstacle(x,z,width,depth,.92);
+    obstacle(x-.75,z-.90,.51,.44,.5);
     shadows.ellipse(x,z,1.65,.88,.27);
   }
   for (const workDesk of WORK_DESKS) desk(workDesk);
   stool(-6.42,-1.57,'#bd855b');
   stool(-3.79,-1.55,'#c08b5c');
-  obstacle(-6.42,-1.57,.51,.44);
-  obstacle(-3.79,-1.55,.51,.44);
+  obstacle(-6.42,-1.57,.51,.44,.5);
+  obstacle(-3.79,-1.55,.51,.44,.5);
 
   function beachMat(mat, index) {
     const {facing, colour} = mat;
@@ -961,7 +965,7 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
     matBlock(index?'#81a298':'#c57d56',.46,.686,.45,.42,.014,.30);
     stick(details,'#6e6051',point(.31,.707,.40),point(.58,.707,.49),.011);
     const centre=onMat(mat,0,.56);
-    obstacle(centre.x,centre.z,Math.abs(c)*1.86+Math.abs(s)*.58,Math.abs(s)*1.86+Math.abs(c)*.58);
+    obstacle(centre.x,centre.z,Math.abs(c)*1.86+Math.abs(s)*.58,Math.abs(s)*1.86+Math.abs(c)*.58,1.0);
     shadows.ellipse(centre.x,centre.z,1.03,.41,.17);
   }
   WORK_MATS.forEach(beachMat);
@@ -1110,7 +1114,7 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
         details.stamp(props.oval, k%3 ? bloom : light, lx+Math.cos(a)*out*r, ly+up*r*.86, lz+Math.sin(a)*out*r, dot, dot*.62, dot, 0, a, 0);
       }
     }
-    obstacle(x,z,size*1.2,size*1.2);
+    obstacle(x,z,size*1.2,size*1.2,size*.95);
     shadows.ellipse(x,z,size*.95,size*.8,.22);
   }
 
@@ -1143,7 +1147,7 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
     for (const dx of [-.13,0,.13]) board(details,'#b97c4c',x+dx,.44,z,.11,.035,1.38);
     for (const dz of [-.55,.55]) block(details,'#77472f',x-.2,.62,z+dz,.06,.48,.08,0,0,.14);
     block(details,'#b97c4c',x-.23,.74,z,.05,.17,1.38,0,0,.14);
-    obstacle(x,z,.5,1.46);
+    obstacle(x,z,.5,1.46,.8);
     shadows.ellipse(x,z,.42,.80,.22);
   }
 
@@ -1152,7 +1156,7 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
     const t = i/5;
     paving(lerp(10.55,13.75,t),1.04+.16*Math.sin(t*Math.PI*1.4),range(.30,.38),range(.21,.27),pick(['#e3cfa6','#d9c39a','#e9d5ae']),range(-.4,.4));
   }
-  bench(13.15,-1.75);
+  bench(COURT_BENCH.x,COURT_BENCH.z);
   frangipani(12.75,3.45,1.1);
   frangipani(20.5,.75,.85);
   for (const [x,z,size,bloom] of [
@@ -1208,6 +1212,17 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
   return {
     obstacles, seats:SEATS, setSwimmer,
     update(t) { for (const animate of animated) animate(t); },
+    // 0 is a clear day. Toward 1 the sky greys, the haze thickens and the sun softens for a shower.
+    setWeather(rain) {
+      const w = Math.min(1, rain) * .8;
+      if (Math.abs(w - weather) < .002) return;
+      weather = w;
+      scene.background.copy(clearSky).lerp(showerSky, w);
+      scene.fog.color.copy(clearHaze).lerp(showerHaze, w);
+      scene.fog.density = .009 + .011 * w;
+      sky.intensity = 1.67 - .50 * w;
+      sunlight.intensity = 2.14 - 1.20 * w;
+    },
     // Fades toward 1 while the local player is inside; snaps with dt = 0.
     setCutaway(target, dt) {
       if (cutaway === target) return;

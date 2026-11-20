@@ -14,7 +14,7 @@ import photoSources from '../photo-sources.json';
 const $=id=>document.getElementById(id);
 renderIcons();
 const byHandle=new Map(residents.map(r=>[r.handle,r]));
-let activity=null,activitySeat=null;
+let leisure=false,activity=null,activitySeat=null;
 const islandActivities={
   josefbuettgen:'Josef swims laps in the cove beside the wooden jetty.',
   odd_joel:'IndiJo stretches out on the terracotta-striped sunbed.',
@@ -55,7 +55,7 @@ function openMember(){memberEditor.open(room.myGuest());}
 function showActivities(){if(!help.open)help.showModal();syncBlock();}
 function syncBlock(){world?.setBlocked(profile.open||help.open||pickerOpen||memberEditor.isOpen());}
 $('join-member').addEventListener('click',openMember);
-function updateParty(){party?.render({...room.get(),nearBall:ballNear,seated:sitting});paintPresence();}
+function updateParty(){party?.render({...room.get(),nearBall:ballNear,seated:sitting&&!leisure});paintPresence();}
 function finishEntry(){
   if(!worldReady||!inWorld||room.get().status!=='online')return;
   if(requestedClaim){const h=requestedClaim;requestedClaim=null;room.trigger('claim',{handle:h});}
@@ -274,7 +274,8 @@ $('help').addEventListener('click',showActivities);
 $('activity-list').addEventListener('click',e=>{
   const id=e.target.closest('[data-activity]')?.dataset.activity;
   if(!id)return;help.close();syncBlock();
-  if(id==='desk')world?.takeSeat();else if(id==='warung')world?.visitWarung();else world?.takeActivity(id);
+  if(id==='desk')world?.takeSeat();else if(id==='bench')world?.takeBench();else if(id==='dog')world?.fetchDog();
+  else if(id==='warung')world?.visitWarung();else world?.takeActivity(id);
 });
 
 function notice(message,delay=2300){
@@ -283,13 +284,16 @@ function notice(message,delay=2300){
 }
 const promptVerbs={swim:'take a dip',lounge:'lounge on the sunbed',ride:'hop on the scooter',climb:'climb the palm',surf:'go surfing',boat:'board the canoe',padel:'play padel',boulder:'go bouldering'};
 function nearby(item) {
-  const verb=!item?'':item.type==='resident'?'meet '+item.resident.shortName:item.type==='seat'?'take a seat':item.type==='ball'?'kick the ball':promptVerbs[item.id];
+  const holding=item?.type==='dog'&&world?.holding()===item.name;
+  const verb=!item?'':item.type==='resident'?'meet '+item.resident.shortName:item.type==='seat'?'take a seat':item.type==='ball'?'kick the ball':
+    item.type==='dog'?(holding?'put '+item.name+' down':'pick up '+item.name):item.type==='perch'?(item.sit?'sit on the rock':'stand up'):promptVerbs[item.id];
   const prompt=$('world-prompt');prompt.hidden=!verb;
   if(verb)prompt.querySelector('span').textContent='to '+verb;
   const b=$('interact');
-  b.hidden=item?.type!=='resident'&&item?.type!=='activity';
+  b.hidden=!['resident','activity','dog','perch'].includes(item?.type);
   if(b.hidden)return;
-  b.innerHTML=icon(item.type==='resident'?'chat':'sun');
+  b.innerHTML=icon(item.type==='resident'?'chat':item.type==='dog'?'paw':item.type==='perch'?'boulder':'sun');
+  if(item.type==='dog'||item.type==='perch'){b.append(document.createTextNode(item.type==='perch'?(item.sit?'Sit down':'Stand up'):(holding?'Put down ':'Pick up ')+item.name));return;}
   b.append(document.createTextNode(item.type==='resident'?'Meet '+item.resident.shortName:({swim:'Take a dip',lounge:'Lounge here',ride:'Ride motorbike',climb:'Climb palm',surf:'Go surfing',boat:'Board the canoe',padel:'Play padel',boulder:'Go bouldering'})[item.id]));
 }
 const clearStick=bindThumbstick($('thumbstick'),(right,forward)=>world?.setStick(right,forward));
@@ -298,28 +302,31 @@ function updateSportStatus(){
   const el=$('sport-caption');let line='';
   if(activity==='padel'){
     const {court,players}=room.get(),shot=court?.shot;
-    const practice=players.filter(p=>courtSide(p.seat)).length<2;
-    line=shot?'Rally '+shot.rally+' · '+(shot.target===courtSide(activitySeat)?'Your return':'Across the net'):(practice?'Solo practice':'Two players')+' · Swing to serve';
+    const mine=courtSide(activitySeat),sides=players.map(p=>courtSide(p.seat)).filter(Boolean);
+    const rivals=sides.filter(s=>s!==mine).length,mates=sides.length-rivals;
+    const game=!rivals?(mates>1?'Practice for two':'Solo practice'):sides.length===4?'Doubles':rivals===mates?'Singles':sides.length+' players';
+    line=shot?'Rally '+shot.rally+' · '+(shot.target===mine?(mates>1?'Your side returns':'Your return'):'Across the net'):game+' · Swing to serve';
     if(!shot&&court?.best)line+=' · Best '+court.best;
   }else if(activity==='boulder')line='Up to climb · Down to descend';
+  else if(activity==='summit')line='Space to hop · E to sit · Jump at the edge to get down';
   else if(activity==='surf')line='Steer the board · Pump for speed';
   else if(activity==='boat')line=activitySeat==='play:boat:bow'?'Bow seat · Riding along':'Helm · Paddle forward and steer';
   el.hidden=!line;if(el.textContent!==line)el.textContent=line;
 }
 function updateFocus(){
   updateParty();const focus=getFocus();
-  $('focus-panel').hidden=!sitting||!focus;$('world-bottom').hidden=sitting&&Boolean(focus);
-  const exits={swim:'Back to shore',lounge:'Get up',climb:'Climb down',ride:'Park motorbike',surf:'Off the board',boat:'Hop off',padel:'Leave court',boulder:'Step off'};
-  const label=exits[activity]||(focus?'Return to work':'Take a seat');
+  $('focus-panel').hidden=!sitting||!focus||leisure;$('world-bottom').hidden=sitting&&Boolean(focus)&&!leisure;
+  const exits={swim:'Back to shore',lounge:'Get up',climb:'Climb down',ride:'Park motorbike',surf:'Off the board',boat:'Hop off',padel:'Leave court',boulder:'Step off',summit:'Jump down'};
+  const label=exits[activity]||(sitting&&leisure?'Get up':focus?'Return to work':'Take a seat');
   play.dataset.activity=activity||'walk';
   const action=$('jump'),verb=activity==='padel'?'Swing':activity==='surf'?'Pump':'Jump';
-  action.hidden=Boolean(sitting||activity&&!['surf','padel'].includes(activity));
+  action.hidden=Boolean(sitting||activity&&!['surf','padel','summit'].includes(activity));
   action.querySelector('i').innerHTML=icon(activity==='padel'?'padel':activity==='surf'?'surf':'jump');
   action.querySelector('span').textContent=verb;action.setAttribute('aria-label',verb);action.title=verb+' (Space)';
   $('thumbstick').hidden=Boolean(sitting||activity==='lounge'||activitySeat==='play:boat:bow');
   updateSportStatus();
-  document.querySelector('.move-hint span').textContent=({swim:'Tap water to swim · Drag to look',ride:'W / S to drive · A / D to steer',climb:'Up to climb · Down to descend',lounge:'Resting on the sunbed',boat:'Tap water to paddle · Drag to look',surf:'Tap water to steer · Space to pump',padel:'Move to the ball · Space to swing',boulder:'Tap the wall or use up and down'})[activity]||'Tap to walk · Drag to look';
-  $('seat').innerHTML=icon(activity?'walk':'coffee')+label;
+  document.querySelector('.move-hint span').textContent=({swim:'Tap water to swim · Drag to look',ride:'W / S to drive · A / D to steer',climb:'Up to climb · Down to descend',lounge:'Resting on the sunbed',boat:'Tap water to paddle · Drag to look',surf:'Tap water to steer · Space to pump',padel:'Move to the ball · Space to swing',boulder:'Tap the wall or use up and down',summit:'Tap the rock to walk · Space to hop'})[activity]||'Tap to walk · Drag to look';
+  $('seat').innerHTML=icon(activity||sitting&&leisure?'walk':'coffee')+label;
   if(!focus)return;
   $('focus-time').textContent=Math.floor(focus.seconds/60).toString().padStart(2,'0')+':'+(focus.seconds%60).toString().padStart(2,'0');
   $('focus-caption').textContent=focus.state==='finished'?'Session complete':focus.state==='paused'?'Taking a break':'At the worktable';
@@ -332,8 +339,8 @@ function cameraChanged(wide){
 const callbacks={
   room,onBallNear(value){ballNear=value;updateParty();},label:$('world-label'),youLabel:$('visitor-label'),onResident:openProfile,onNearby:nearby,notice,onCamera:cameraChanged,
   onActivity(value,seat){activity=value;activitySeat=seat;updateFocus();},
-  onSit(){sitting=true;if(!getFocus())beginFocus();updateFocus();$('world-status').hidden=true;},
-  onLeaveSeat(){sitting=false;if(getFocus()?.state==='running')toggleFocus();updateFocus();}
+  onSit(seat){sitting=true;leisure=Boolean(seat?.leisure);if(!leisure&&!getFocus())beginFocus();updateFocus();$('world-status').hidden=true;},
+  onLeaveSeat(){sitting=false;leisure=false;if(getFocus()?.state==='running')toggleFocus();updateFocus();}
 };
 function getWorld(){
   if(!worldTask){
@@ -404,7 +411,7 @@ document.addEventListener('keydown',e=>{
 $('enter').addEventListener('click',()=>enterWorld());
 $('leave').addEventListener('click',leaveWorld);
 $('camera').addEventListener('click',()=>{world?.toggleCamera();host.focus({preventScroll:true});});
-$('seat').addEventListener('click',()=>{if(activity)world?.stand();else world?.takeSeat();host.focus({preventScroll:true});});
+$('seat').addEventListener('click',()=>{if(activity||sitting&&leisure)world?.stand();else world?.takeSeat();host.focus({preventScroll:true});});
 $('interact').addEventListener('click',()=>world?.interact());
 $('find-resident').addEventListener('click',()=>{
   const handle=activeResident.handle;lastTrigger=null;dismiss(profile);

@@ -1,4 +1,5 @@
 import {SWIM_LEVEL,waterEntry} from '../shared/mobility.js';
+import {createOutings} from './npc-outings.js';
 const TAU = Math.PI * 2;
 const clamp = (n, low = 0, high = 1) => Math.min(high, Math.max(low, n));
 function smooth(t) {
@@ -22,12 +23,20 @@ export function onMat(mat, across, forward) {
   return { x: mat.x + c * across + s * forward, z: mat.z - s * across + c * forward };
 }
 
+// A slatted bench on the padel lawn, facing east across the court. Two people fit side by side.
+export const COURT_BENCH = { x: 13.15, z: -1.75 };
+
 export const SEATS = [
   ...WORK_DESKS.map(({x,z,label}, id) => ({ id, x, z: z + 1.05, facing: Math.PI, label })),
   ...WORK_DESKS.map(({x,z,label}, i) => ({ id: i + 2, x: x - .75, z: z - .90, facing: 0, label: label + ', back stool' })),
   ...WORK_MATS.flatMap((mat, i) => [-.68,.68].map((across, j) => ({
     id: 4 + i * 2 + j, ...onMat(mat, across, -.25), facing: mat.facing, label: mat.label + (j ? ', right cushion' : ', left cushion'),
   }))),
+  // Benches are for watching, not working: sitting here starts no focus session. Approach from the front.
+  ...[-.36, .36].map((along, j) => ({
+    id: 8 + j, x: COURT_BENCH.x + .03, z: COURT_BENCH.z + along, facing: Math.PI / 2, leisure: true,
+    label: 'Court bench', approach: { x: COURT_BENCH.x + .80, z: COURT_BENCH.z + along },
+  })),
 ];
 
 export const SWIMMER_INDEX = 4;
@@ -40,7 +49,12 @@ export const SUNBEDS = [-.99,0,.99].map((across,i)=>({
   upright:i===1,colour:['#cb795a','#719789','#778fa8'][i],
 }));
 export const STUDIO_STOOL = {x:7.55,y:.235,z:-2.29,facing:0};
-export const STRETCH_MAT = {x:5.12,z:3.88,facing:-.55};
+// Sandro's mat. He teaches the yoga classes from here, facing the students' mats on the east lawn.
+export const STRETCH_MAT = {x:5.12,z:3.88,facing:1.075};
+// Two rows on the open sand between the garden beds east of the warung tables.
+export const YOGA_MATS = [[2.6,-.72],[2.6,.72],[4.3,-.72],[4.3,.72]].map(([forward,across],i)=>({
+  ...onMat(STRETCH_MAT,across,forward),facing:STRETCH_MAT.facing+Math.PI,colour:['#cf8a68','#7f9db1','#d2ae62','#8fa883'][i],
+}));
 
 const loungeLand=(bed)=>({...onMat(bed,0,1.50),yaw:bed.facing+Math.PI});
 export const PLAY_SPOTS = [
@@ -144,23 +158,10 @@ function inMotion(path, t, returning, seconds) {
  * y is the absolute floor / waterline height supplied to the figure's root.
  * land marks a safe place on the sand for approaching or claiming an activity.
  */
-export function npcPose(index, serverTimeMs) {
+function restPose(index, seconds, home) {
   const path = paths[index];
-  if (!path) return null;
-  const seconds = Number.isFinite(serverTimeMs) ? serverTimeMs / 1000 : 0;
-  if(index===SWIMMER_INDEX) {
-    return swimPose(seconds,0,2.49,-9.64,.99,.24,14.8,SWIM_LANDING);
-  }
   const station=stations.get(index);
   if(station) return {x:station.x,z:station.z,y:station.y??0,yaw:station.facing,walking:false,seated:true,activity:station.activity,land:station.land};
-  const clock = ((seconds + path.offset) % path.period + path.period) % path.period;
-  if (clock >= path.depart && clock < path.depart + path.outward) {
-    return inMotion(path, (clock - path.depart) / path.outward, false, seconds);
-  }
-  if (clock >= path.leave && clock < path.leave + path.homeward) {
-    return inMotion(path,(clock-path.leave)/path.homeward,true,seconds);
-  }
-  const home = clock < path.depart || clock >= path.leave + path.homeward;
   const x=home ? path.x : path.mx, z=home ? path.z : path.mz, seated=home && path.stool;
   let activity=seated ? 'sit' : 'idle', yaw=atRest(path,seconds,home);
   if(index===3){
@@ -171,6 +172,50 @@ export function npcPose(index, serverTimeMs) {
   }
   return {x,z,y:0,yaw,walking:false,seated,activity,land:seated ? {x,z:z+.79,yaw:0} : null};
 }
+
+// When a resident's chat routine next has them at home, at or after `seconds`.
+function nextHome(index, seconds) {
+  const path = paths[index];
+  if(stations.has(index)) return seconds;
+  const clock = ((seconds + path.offset) % path.period + path.period) % path.period;
+  return clock >= path.depart && clock < path.leave + path.homeward ? seconds + path.leave + path.homeward - clock : seconds;
+}
+
+export const outings = createOutings({
+  homes: walks.map(([,x,z,,,,,,stool],i) => i===SWIMMER_INDEX ? null : stations.has(i)
+    ? {x:stations.get(i).x,z:stations.get(i).z,exit:stations.get(i).land}
+    : {x,z,exit:stool ? {x,z:z+.79} : null}),
+  nextHome, homePose:(index,seconds)=>restPose(index,seconds,true), seats:SEATS, mats:YOGA_MATS, teacherMat:STRETCH_MAT,
+});
+
+/**
+ * Pose for an unclaimed resident at a shared wall-clock time.
+ * y is the absolute floor / waterline height supplied to the figure's root.
+ * land marks a safe place on the sand for approaching or claiming an activity.
+ * busy lists the shared spots players hold right now, so residents make way. The room omits it.
+ */
+export function npcPose(index, serverTimeMs, busy=null) {
+  const path = paths[index];
+  if (!path) return null;
+  const seconds = Number.isFinite(serverTimeMs) ? serverTimeMs / 1000 : 0;
+  if(index===SWIMMER_INDEX) {
+    return swimPose(seconds,0,2.49,-9.64,.99,.24,14.8,SWIM_LANDING);
+  }
+  const out=outings.pose(index,seconds,busy);
+  if(out) return out;
+  if(stations.has(index)) return restPose(index,seconds,true);
+  const clock = ((seconds + path.offset) % path.period + path.period) % path.period;
+  if (clock >= path.depart && clock < path.depart + path.outward) {
+    return inMotion(path, (clock - path.depart) / path.outward, false, seconds);
+  }
+  if (clock >= path.leave && clock < path.leave + path.homeward) {
+    return inMotion(path,(clock-path.leave)/path.homeward,true,seconds);
+  }
+  return restPose(index,seconds,clock < path.depart || clock >= path.leave + path.homeward);
+}
+
+/** The ball two residents are rallying with, or null when the court is theirs to leave alone. */
+export const npcPadelShot = serverTimeMs => outings.padelShot(serverTimeMs/1000);
 
 /** A navigable land origin for a player taking over an NPC, including the swimmer. */
 export function npcLandPose(index, serverTimeMs) {
