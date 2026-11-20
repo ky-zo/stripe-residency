@@ -13,9 +13,9 @@ export function memberPortrait(appearance){
     renderer.setSize(320,320,false);
     renderer.outputColorSpace=T.SRGBColorSpace;
     scene=new T.Scene();
-    scene.add(new T.HemisphereLight('#fff6e6','#cdbcae',1.65));
+    scene.add(new T.HemisphereLight('#fff8ee','#eddcd0',1.9));
     const key=new T.DirectionalLight('#fff1dc',2.35);key.position.set(-2.2,4,3.2);scene.add(key);
-    const fill=new T.DirectionalLight('#e0ecff',.72);fill.position.set(2.8,2,-1);scene.add(fill);
+    const fill=new T.DirectionalLight('#f1f6ff',1.05);fill.position.set(3,1.9,3.8);scene.add(fill);
     camera=new T.PerspectiveCamera(26,1,.1,12);
   }
   scene.background=new T.Color(appearance.shirt).lerp(new T.Color('#fff4dc'),.68);

@@ -20,9 +20,9 @@ export function clayStudio(T) {
   const scale = new T.Vector3();
   const euler = new T.Euler();
   const clay = new T.MeshStandardMaterial({
-    vertexColors: true, roughness: 0.66, metalness: 0
+    vertexColors: true, roughness: .84, metalness: 0
   });
-  const eyeClay=new T.MeshStandardMaterial({vertexColors:true,roughness:.31,metalness:0});
+  const eyeClay=new T.MeshStandardMaterial({vertexColors:true,roughness:.50,metalness:0});
 
   function paint(value) {
     if (value?.isColor) return value;
@@ -179,6 +179,17 @@ export function clayStudio(T) {
       for(let i=0;i<steps;i++) for(let j=0;j<sides;j++) {
         const a=i*sides+j,b=i*sides+(j+1)%sides;
         faces.push(a,b,a+sides,b,b+sides,a+sides);
+      }
+      for(const t of [0,1]) {
+        const center=curve.getPointAt(t),direction=curve.getTangentAt(t);
+        center.addScaledVector(direction,(t?1:-1)*thickness*taper*.75);
+        const tip=points.length/3,first=t*steps*sides;
+        points.push(center.x,center.y,center.z);
+        colors.push(tint.r,tint.g,tint.b);
+        for(let j=0;j<sides;j++) {
+          const a=first+j,b=first+(j+1)%sides;
+          if(t) faces.push(a,b,tip); else faces.push(b,a,tip);
+        }
       }
       this.surface(color,points,faces,colors);
     }

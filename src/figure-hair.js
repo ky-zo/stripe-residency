@@ -1,197 +1,156 @@
 const TAU=Math.PI*2;
 const longCuts=new Set(['long','halfUp','wings','curtains','bangs','layered']);
 
-function restOnForehead(path,faceZ,padding=.015) {
-  for(const p of path) {
-    if(p[2]>.098&&p[1]<.309) {
-      const surface=faceZ(p[0],p[1]-.012)*1.05+padding;
-      const temple=Math.max(0,Math.min(1,(Math.abs(p[0])-.145)/.082));
-      p[2]=Math.max(surface,p[2]+(Math.min(p[2],surface+.012)-p[2])*temple);
-    }
-  }
-  return path;
+function strand(part,look,mix,faceZ,path,width,thickness,tint=0,taper=.27) {
+  const points=path.map(([x,y,lift=.018])=>{
+    const scalp=faceZ(x,Math.min(y-.006,.313));
+    return [x,y+.009,scalp+lift+.012];
+  });
+  const color=mix(look.hair,'#aa846b',tint);
+  part.lock(color,points,width,thickness*1.42,Math.max(.32,taper),16);
 }
 
-function shortLocks(part,look,mix,faceZ) {
-  const {style,hair,id}=look;
-  const swept=style==='swoop',spiky=style==='silverQuiff';
-  const tall=style==='quiff'||spiky;
-  const clipped=style==='combed'||style==='fade';
-  const count=swept?9:clipped?8:10;
-  const height=tall?(spiky?.376:id==='fiachrarm'?.337:.355):clipped?.321:.339;
-  const brown=spiky?'#c0b2a7':'#bf976d';
-  const lightness=swept?.031:spiky?.11:.075;
-  for(let j=0;j<count;j++) {
-    const t=j/(count-1),x=(t-.5)*.418;
-    const dome=Math.sqrt(Math.max(.02,1-(x/.31)**2));
-    const wave=Math.sin(j*2.72)*.011;
-    const path=swept?[
-      [.158-.098*t,.256-.015*t,-.130+.063*t],
-      [.191-.105*t,.304-.012*t,-.017+.036*t],
-      [.133-.174*t,.333-.017*t,.092+.047*t],
-      [.028-.193*t,.291-.027*t,.180+.027*t],
-      [-.058-.168*t,.223-.043*t,.212-.038*t],
-      [-.135-.114*t,.137-.031*t,.212-.094*t]
-    ]:[
-      [x*.76+.034,.224*dome,-.155],
-      [x*.90+.035,.296*dome,-.101],
-      [x*.92+.032+wave,(height+wave)*dome,-.008],
-      [x*.93+.014+wave,(height+.002+wave)*dome,.091],
-      [x*.95-.016,(height-.038+wave)*dome,.168],
-      [x*.90-.053,(clipped?.225:.206)*dome+.017*Math.sin(t*2.4)+wave,.214-.038*Math.abs(t-.47)*2]
-    ];
-    if(clipped) for(const p of path) {p[0]+=.040*t;p[2]-=.015;}
-    if(tall) {
-      for(let k=2;k<5;k++) path[k][0]-=.011*Math.sin(j*.85+k*.49);
-      if(id==='fiachrarm') { path[3][0]+=.016*Math.sin(j*1.2);path[4][1]+=.011*Math.cos(j*.9); }
-    }
-    const shade=mix(hair,brown,lightness*(.35+.65*(.5+.5*Math.sin(j*2.34))));
-    restOnForehead(path,faceZ,swept?.015:.020);
-    part.lock(shade,path,swept?.046:clipped?.041:.048,tall?.035:.025,.11,15);
-    if(j%2===1) {
-      const thread=path.slice(1,-1).map(([x,y,z],k)=>[x-.004,y+.015*Math.sin((k+1)*.61),z+.010]);
-      part.stroke(mix(hair,brown,lightness*1.35),thread,.0042,.12,10,5);
-    }
+function sideSweep(part,look,mix,faceZ) {
+  const hair=[
+    [[[.14,.278],[.083,.326],[-.005,.337],[-.100,.307],[-.181,.245],[-.245,.177]],.059,.034,.036],
+    [[[.172,.250],[.133,.298],[.059,.309],[-.030,.281],[-.100,.226],[-.182,.198],[-.257,.134]],.062,.034,.014],
+    [[[.173,.227],[.125,.272],[.070,.264],[.001,.227],[-.080,.196],[-.159,.181],[-.238,.123]],.054,.030,.047],
+    [[[.146,.239],[.192,.269],[.232,.236],[.251,.176],[.272,.117]],.046,.028,.026],
+    [[[.217,.249],[.254,.239],[.274,.187],[.288,.130],[.293,.081]],.040,.025,.017]
+  ];
+  for(const [line,w,h,shade] of hair) strand(part,look,mix,faceZ,line,w,h,shade);
+}
+
+function shortCut(part,look,mix,faceZ) {
+  if(look.style==='swoop') return sideSweep(part,look,mix,faceZ);
+  const {id,style}=look;
+  const spiky=style==='silverQuiff',tousled=id==='fiachrarm';
+  const high=style==='quiff'||spiky,tidy=style==='combed'||style==='fade';
+  const height=spiky?.375:id==='josefbuettgen'?.369:high?.354:tidy?.333:.346;
+  const count=tousled?6:spiky?6:tidy?4:5;
+  const direction=id==='josefbuettgen'||id==='founderish'?-1:1;
+  for(let i=0;i<count;i++) {
+    const f=i/(count-1),x=(-.179+f*.360)*direction,wave=Math.sin(i*2.45)*.008;
+    const h=height-.062*Math.abs(f-.51)*1.85+wave;
+    const sweep=(tidy?.094:tousled?.043:spiky?.074:.060)*direction;
+    const base=.210-.035*Math.abs(f-.46)*1.8+(high?.015:0)+wave;
+    const path=[[x+sweep*.30,h-.055,-.012],[x+sweep*.85,h-.008,.010],
+      [x+sweep*.90,h+.007,.030],[x+sweep*.18,h-.001,.064],
+      [x-sweep*.58,base+.048,.049],[x-sweep*.86,base+.012,.021]];
+    if(tousled) {path[2][0]+=.014*Math.sin(i*1.77);path[4][1]+=.013*Math.cos(i);}
+    if(tidy) {path[4][0]-=.030*direction;path[5][0]-=.032*direction;}
+    if(spiky) {path[1][1]+=.017;path[3][0]-=.025;}
+    strand(part,look,mix,faceZ,path,tousled?.046:tidy?.051:.056,spiky?.033:.030,.014+.030*(i%3)/2,spiky?.15:.28);
   }
-  if(tall||style==='swept'||style==='combed') {
-    const tousled=id==='fiachrarm',pushed=id==='josefbuettgen'||id==='sandrokratz',neat=style==='combed';
-    const strands=tousled?10:neat?5:pushed?5:spiky?7:6;
-    for(let j=0;j<strands;j++) {
-      const t=j/(strands-1),x=(t-.5)*.374+.011*Math.sin(j*3.13+1.3);
-      const side=Math.abs(t-.47)*2,rag=Math.sin(j*2.09)*.012;
-      const y=.222-.049*side+rag+(pushed?.021:neat?.013:0);
-      const shift=(spiky?.060:tousled?.039:neat?.098:pushed?.077:.068)*(1+.23*Math.sin(j*1.84));
-      const bend=tousled?.017*Math.sin(j*2.52):spiky?-.012*Math.cos(j*.94):.008;
-      const path=[[x+shift*.25,y+.070,.140],[x+shift,y+.081+bend,.153],
-        [x+shift*(tousled?.68:.92),y+.064+rag,.190],[x+shift*.26+bend,y+.030,.217],
-        [x-shift*.37,y,.230],[x-shift*.45+bend,y-.006+rag,.228]];
-      restOnForehead(path,faceZ,.024);
-      const width=(tousled?.026:neat?.029:pushed?.033:.034)+rag*.18;
-      part.lock(mix(hair,brown,lightness*(.45+.55*(j%3)/2)),path,width,tousled?.016:.019,.045,12);
-      if(j%2===0&&!neat) {
-        const fiber=path.slice(1,-1).map(([a,b,c],k)=>[a+.004,b+.011-k*.001,c+.009+k*.0015]);
-        part.stroke(mix(hair,brown,lightness*1.5),fiber,.0026,.15,8,5);
-      }
-    }
-  }
-  if(spiky) for(const s of [-1,1]) {
-    for(let j=0;j<8;j++) {
-      const t=j/7,z=-.121+t*.248;
-      part.lock(mix(hair,'#c4bbb0',.29+.14*Math.sin(j*.9)),[[s*(.262+.019*Math.cos(t)),.172,z-.027],
-        [s*(.294-.016*Math.abs(t-.56)),.111,z],[s*(.294-.018*Math.abs(t-.5)),.067,z+.006]],.012,.009,.10,6);
-    }
+  // The shorter temple pieces turn back toward the ear and connect the forelock to the cap.
+  for(const s of [-1,1]) {
+    const shade=spiky?.20:.018;
+    strand(part,look,mix,faceZ,[[s*.185,.243],[s*.227,.233],[s*.263,.192],[s*.281,.146],
+      [s*.283,.099]],spiky?.035:.043,.025,shade,.32);
+    if(spiky) strand(part,look,mix,faceZ,[[s*.239,.204],[s*.264,.168],[s*.283,.127],[s*.290,.086]],.021,.015,.30,.25);
   }
 }
 
-function curledLocks(part,look,mix) {
-  const {hair,id}=look;
-  const tight=id==='sup_nim';
-  const high=id==='loaibassam';
-  const density=tight?15:14;
-  for(let row=0;row<3;row++) {
-    const n=density-row*4;
-    const radius=[.236,.167,.084][row];
+function curls(part,look,mix) {
+  const {hair,id}=look,small=id==='sup_nim',tall=id==='loaibassam';
+  const rows=small?[13,9,4]:[11,8,4];
+  for(const [row,n] of rows.entries()) {
+    const radius=[.233,.155,.064][row];
     for(let j=0;j<n;j++) {
-      const a=j/n*TAU+row*.54;
-      const rr=radius+.009*Math.sin(j*2.32+row);
-      const w=(tight?.051:.059)+.007*Math.sin(j*3.81+row);
-      const baseY=[.187,.262,.299][row]+Math.cos(a)*.024+(high?.020:0);
-      const r=[Math.sin(a),0,Math.cos(a)],t=[Math.cos(a),0,-Math.sin(a)];
-      const c=[r[0]*rr,baseY,r[2]*rr*.85-.020];
-      const shade=mix(hair,'#957b68',.025+.040*(.5+.5*Math.sin(j*1.79+row)));
-      part.dot(shade,c[0],c[1],c[2],w*1.16,w*.90,w,[.12,a,.23*Math.sin(j)]);
-      const path=[];
-      for(let step=0;step<7;step++) {
-        const f=step/6,phase=f*4.8+.34*Math.sin(j*2.21);
-        const across=Math.sin(phase)*w*.77,up=Math.cos(phase)*w*.59;
-        path.push([c[0]+t[0]*across+r[0]*w*(.57+.21*Math.sin(f*Math.PI)),c[1]+up+.018,
-          c[2]+t[2]*across+r[2]*w*.63]);
+      const a=j/n*TAU+row*.57,rad=radius+.011*Math.sin(j*2.42+row);
+      const w=(small?.057:.068)+.006*Math.cos(j*3.45+row);
+      const y=[.194,.258,.300][row]+Math.cos(a)*.017+(tall?.021:0);
+      const s=Math.sin(a),c=Math.cos(a);
+      const cx=s*rad,cz=c*rad*.91-.008;
+      const ink=mix(hair,'#94745f',.017+.045*(1+Math.sin(j*1.83+row))*.5);
+      part.oval(ink,cx,y,cz,w*1.04,w*.90,w*.96,[.12,a,.22*Math.sin(j*2.12)]);
+      if((j+row)%2===1||c>.5) {
+        const curl=[];
+        for(let k=0;k<6;k++) {
+          const phase=.11+k/5*4.0,across=Math.sin(phase)*w*.76;
+          const front=w*(.68+.24*Math.sin(k/5*Math.PI));
+          curl.push([cx+c*across+s*front,y+Math.cos(phase)*w*.60+.015,cz-s*across+c*front]);
+        }
+        part.lock(mix(ink,'#aa856c',.047),curl,w*.39,w*.36,.36,12);
       }
-      part.lock(mix(shade,'#ad8a68',.034),path,w*.37,w*.34,.12,9);
     }
   }
 }
 
-function splitFringe(part,look,mix,faceZ) {
-  const {hair,style}=look;
-  const short=style==='parted';
-  const off=style==='layered'?-.069:style==='curtains'?.003:style==='halfUp'?-.025:.00;
+function parting(part,look,mix,faceZ) {
+  const style=look.style,short=style==='parted',wave=style==='wings'||style==='layered';
+  const center=style==='layered'?-.056:style==='halfUp'?-.032:short?.005:-.009;
   for(const s of [-1,1]) {
-    for(let j=0;j<5;j++) {
-      const t=j/4,front=.235-.155*t;
-      const path=[
-        [off+s*(.016+.057*t),.305+.011*(1-t),-.080-.069*t],
-        [off+s*(.036+.086*t),.332-.017*t,.020-.082*t],
-        [off+s*(.085+.108*t),.310-.019*t,.126-.075*t],
-        [off+s*(.145+.092*t),.251-.018*t,front],
-        [off+s*(.207+.068*t),.177-.024*t,front-.006],
-        [off+s*(.235+.035*t),short?.092-.018*t:.044-.061*t,front-.048]
-      ];
-      if(style==='halfUp'&&j>1) path[5][2]-=.067;
-      if(short) {
-        path[3][0]-=s*.033;
-        path[4][0]-=s*.038;path[4][1]-=.020;
-        path[5][0]+=s*.028;path[5][1]+=.036;
-        path[5][2]+=.034;
-      }
-      if(style==='wings') {path[3][0]+=s*.011;path[4][0]+=s*.019;}
-      restOnForehead(path,faceZ,.020+.008*(1-t));
-      const tint=mix(hair,'#b18b69',.016+.037*(1-t));
-      part.lock(tint,path,.043-.006*t,.028-.006*t,.075,15);
-    }
+    const p=x=>center+s*x;
+    const drift=s>0?.007:-.006;
+    const inner=short?[
+      [p(.004),.277],[p(.028),.327],[p(.089),.347+drift],[p(.151),.314],[p(.167),.252],
+      [p(.145),.203],[p(.105),.168+drift]
+    ]:[
+      [p(.010),.271],[p(.025),.316],[p(.087),.328+drift],[p(.139),.294],
+      [p(.173),.243],[p(.211),.200],[p(.248),wave?.143:.153]
+    ];
+    strand(part,look,mix,faceZ,inner,short?.062:.058,.039,.033,.34);
+    const middle=[[p(.037),.295],[p(.097),.327+drift],[p(.171),.294],
+      [p(.213),.238],[p(.222),.192],[p(.249),.145],[p(.267),short?.119:.083]];
+    if(style==='halfUp') {middle[4][0]=p(.252);middle[5][0]=p(.274);}
+    strand(part,look,mix,faceZ,middle,.057,.038,.050,.36);
+    const outer=[[p(.111),.277],[p(.170),.285],[p(.230),.251],[p(.266),.195],
+      [p(.283),.144],[p(.289),short?.087:.044]];
+    strand(part,look,mix,faceZ,outer,.045,.032,.015,.33);
   }
 }
 
-function fallingLocks(part,look,mix) {
-  const {hair,style}=look;
-  const long=style!=='wings'&&style!=='curtains';
-  const bottom=long?-.410:style==='wings'?-.255:-.160;
-  const wave=style==='layered'||style==='wings'||style==='bangs';
-  const mid=(bottom+.18)/2;
-  part.oval(hair,0,(bottom+.26)/2,-.139,.302,(.27-bottom)/2,.151);
-  for(let j=0;j<9;j++) {
-    const x=(j-4)*.061;
-    const z=-.150-.145*Math.sqrt(Math.max(.02,1-(x/.31)**2));
-    const bend=(wave?.026:.010)*Math.sin(j*1.39);
-    const y=bottom+.021*Math.abs(j-4);
-    const path=[[x*.53,.276,-.145],[x*.84,.183,z+.006],[x+bend*.35,.040,z-.009],
-      [x+bend,-.094,z-.011],[x-bend*.3,(y-.085)/2,z-.011],[x+bend,y,z+.024]];
-    part.lock(mix(hair,'#ae886a',.025+.043*((j%3)/2)),path,.046,.027,.14,14);
+function flowingHair(part,look,mix,faceZ) {
+  const {hair,style}=look,wave=['layered','wings','bangs'].includes(style);
+  const bottom=style==='wings'?-.231:style==='curtains'?-.161:style==='long'?-.338:-.401;
+  const half=(.27-bottom)/2,long=bottom<-.32;
+  part.oval(hair,0,.27-half,-.146,long?.329:.312,half,.165);
+  for(let j=0;j<6;j++) {
+    const x=(j-2.5)*.091,z=-.145-.153*Math.sqrt(Math.max(.03,1-(x/.307)**2));
+    const curl=(wave?.039:.013)*Math.sin(1.27*j);
+    const y=bottom+.015*Math.abs(j-2.5);
+    const line=[[x*.53,.268,-.140],[x*.90,.165,z],[x+curl*.4,.010,z-.007],
+      [x+curl,(y+.004)*.45,z-.009],[x-curl*.3,y+.088,z],[x+curl*.6,y,z+.028]];
+    part.lock(mix(hair,'#a68267',.018+.032*((j%3)/2)),line,.066,.033,.30,15);
   }
   for(const s of [-1,1]) {
-    const tuck=(style==='halfUp')||(style==='bangs'&&s>0)||(style==='layered'&&s<0);
-    const z=tuck?-.032:.049;
-    part.oval(hair,s*.260,mid,z,tuck?.062:.079,(.21-bottom)*.50,tuck?.096:.104,[.037,0,s*.055]);
-    for(let j=0;j<3;j++) {
-      const f=j/2,front=z+.079-.096*f,ww=wave?.049:.017;
-      const dir=style==='layered'?s*1.22:s;
-      const path=[[s*(.207+.033*f),.205,front+.071],[s*.269,.110,front+.068],
-        [s*(.278+.012*f),.007,front+.063],[s*.251,-.083,front+.066],
-        [s*(.267+ww),bottom*.53,front+.033],
-        [s*.290+dir*ww,bottom*.89,front+.004],[s*.28+dir*ww*(.4+f),bottom+.016*f,front-.012]];
-      if(!long) {path[4][1]=-.103;path[5][1]=bottom*.89;}
-      part.lock(mix(hair,'#c29369',.043+.058*(1-f)),path,.039-.006*f,.032-.004*f,.095,13);
+    const tucked=style==='halfUp'||(style==='layered'&&s<0);
+    const z=tucked?-.041:.026;
+    part.oval(hair,s*(long?.289:.277),(.18+bottom)/2,z,long?.092:.081,(.21-bottom)*.51,.105,[.042,0,s*.05]);
+    for(let j=0;j<2;j++) {
+      const x=(long?.302:.286)+j*.018;
+      const a=(tucked?.034:.105)-j*.073,flip=wave?.054:.017;
+      const line=[[s*.232,.200,Math.max(a+.08,faceZ(.232,.195)+.010)],
+        [s*.270,.107,Math.max(a+.059,faceZ(.27,.102)+.006)],
+        [s*(x+flip*.35),.006,a+.080],[s*(x-flip*.55),bottom*.33,a+.058],
+        [s*(x+flip),bottom*.68,a+.039],[s*(x-flip*.15),bottom+.015*j,a+.001]];
+      if(tucked)for(let k=2;k<line.length;k++)line[k][2]-=.026;
+      part.lock(mix(hair,'#b78967',.031+.053*(1-j)),line,.059-j*.008,.045,.36,17);
     }
   }
   if(style==='halfUp') {
-    part.oval(hair,0,.017,-.252,.126,.18,.083);
-    part.dot('#887568',0,-.038,-.329,.025,.019,.011);
+    part.oval(hair,0,.014,-.258,.123,.175,.084);
+    part.oval('#94765c',0,-.026,-.337,.028,.017,.013);
   }
 }
 
-export function groomHair(part,look,mix,faceZ) {
-  if(look.style==='curls') return curledLocks(part,look,mix);
-  if(longCuts.has(look.style)) fallingLocks(part,look,mix);
-  if(look.style==='bangs') {
-    for(let j=-4;j<=4;j++) {
-      const x=j*.048,spread=Math.abs(j)/4;
-      const path=[[x*.51,.278,.061],[x*.77,.273,.149],[x*.92,.224,.212-.048*spread],
-        [x, .166,.248-.066*spread],[x+.013*Math.sin(j),.104+.020*spread+.012*(j===0),.261-.078*spread]];
-      restOnForehead(path,faceZ,.014);
-      part.lock(mix(look.hair,'#a88a66',.035+.025*(j%2===0)),path,.035,.025,.07,12);
-    }
-    return;
+function softBangs(part,look,mix,faceZ) {
+  const locks=[[-.185,.102,.044,-.021],[-.113,.111,.048,-.027],[-.039,.119,.044,-.008],
+    [.030,.103,.048,.019],[.105,.123,.048,.031],[.171,.111,.043,.034]];
+  for(let i=0;i<locks.length;i++) {
+    const [x,y,w,shift]=locks[i];
+    const line=[[x*.35,.298],[x*.54,.285],[x*.81,.246],[x,.196],
+      [x+shift*.46,.148],[x+shift,y]];
+    strand(part,look,mix,faceZ,line,w,.031,.016+.033*(i%2),.44);
   }
-  if(longCuts.has(look.style)||look.style==='parted') return splitFringe(part,look,mix,faceZ);
-  shortLocks(part,look,mix,faceZ);
+  for(const s of [-1,1]) strand(part,look,mix,faceZ,[[s*.141,.260],[s*.221,.218],[s*.259,.157],[s*.279,.098]],.040,.028,.023,.32);
+}
+
+export function groomHair(part,look,mix,faceZ) {
+  if(look.style==='curls') return curls(part,look,mix);
+  if(longCuts.has(look.style)) flowingHair(part,look,mix,faceZ);
+  if(look.style==='bangs') return softBangs(part,look,mix,faceZ);
+  if(longCuts.has(look.style)||look.style==='parted') return parting(part,look,mix,faceZ);
+  shortCut(part,look,mix,faceZ);
 }

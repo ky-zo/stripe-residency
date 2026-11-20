@@ -38,14 +38,14 @@ export function showModel(host,handle,appearance,backdrop) {
   const tone=backdrop||appearance?.shirt||'#c7d3ba';
   scene.background=portraitBackdrop(tone);
   const camera=new T.PerspectiveCamera(31,1,.1,20);
-  scene.add(new T.HemisphereLight('#fff7e8','#c6c3aa',1.75));
+  scene.add(new T.HemisphereLight('#fff8ee','#eddcd0',1.9));
   const key=new T.DirectionalLight('#fff2d9',2.1);
-  key.position.set(-2.3,6,2.7);key.castShadow=true;key.shadow.mapSize.set(512,512);
+  key.position.set(-2.6,4.2,3.6);key.castShadow=true;key.shadow.mapSize.set(512,512);
   key.shadow.camera.left=-1.6;key.shadow.camera.right=1.6;key.shadow.camera.top=2;key.shadow.camera.bottom=-1.4;
   key.shadow.camera.near=.1;key.shadow.camera.far=13;key.shadow.normalBias=.010;
   key.shadow.radius=7;key.shadow.blurSamples=8;scene.add(key);
-  const rim=new T.DirectionalLight('#e4efdc',1.15);
-  rim.position.set(2.3,3,-3);scene.add(rim);
+  const fill=new T.DirectionalLight('#f1f6ff',1.05);
+  fill.position.set(3,1.9,3.8);scene.add(fill);
   const figure=createFigure(T,appearance?'visitor':handle,{appearance});
   scene.add(figure.root);
   const bounds=new T.Box3().setFromObject(figure.root),center=bounds.getCenter(new T.Vector3());

@@ -1,7 +1,7 @@
 const roster = [
   {
     handle: 'phuctm97',
-    backdrop: '#fabd97',
+    backdrop: '#fbb58e',
     name: 'Minh-Phuc Tran',
     shortName: 'Phuc',
     role: 'Hacker Residency host',
@@ -11,7 +11,7 @@ const roster = [
   },
   {
     handle: 'ky__zo',
-    backdrop: '#95c0ab',
+    backdrop: '#94c3a9',
     name: 'kyzo',
     shortName: 'kyzo',
     role: 'CopyCopter maker',
@@ -21,7 +21,7 @@ const roster = [
   },
   {
     handle: 'Erwin_AI',
-    backdrop: '#f8c169',
+    backdrop: '#fac771',
     name: 'Erwin',
     shortName: 'Erwin',
     role: 'Tailscan founder',
@@ -31,7 +31,7 @@ const roster = [
   },
   {
     handle: 'dannypostma',
-    backdrop: '#93bfd1',
+    backdrop: '#90c1d8',
     name: 'Danny Postma',
     shortName: 'Danny',
     role: 'HeadshotPro founder',
@@ -41,7 +41,7 @@ const roster = [
   },
   {
     handle: 'josefbuettgen',
-    backdrop: '#f49583',
+    backdrop: '#f69a8d',
     name: 'Josef Büttgen',
     shortName: 'Josef',
     role: 'Software developer',
@@ -51,7 +51,7 @@ const roster = [
   },
   {
     handle: 'melanieklenner',
-    backdrop: '#cdadd6',
+    backdrop: '#cfa9d3',
     name: 'Melanie Klenner',
     shortName: 'Melanie',
     role: 'PoloFlow co-founder',
@@ -62,7 +62,7 @@ const roster = [
   },
   {
     handle: 'ann_nnng',
-    backdrop: '#d3827f',
+    backdrop: '#d87f84',
     name: 'Ann Nguyen',
     shortName: 'Ann',
     role: 'Frontend developer',
@@ -72,7 +72,7 @@ const roster = [
   },
   {
     handle: 'loaibassam',
-    backdrop: '#f7b669',
+    backdrop: '#f8b262',
     name: 'Leo Bassam',
     shortName: 'Leo',
     role: 'Plutio founder',
@@ -82,7 +82,7 @@ const roster = [
   },
   {
     handle: 'sup_nim',
-    backdrop: '#bedbbd',
+    backdrop: '#a6d3b3',
     name: 'nim',
     shortName: 'nim',
     role: 'Design engineer',
@@ -92,7 +92,7 @@ const roster = [
   },
   {
     handle: 'founderish',
-    backdrop: '#92bdd8',
+    backdrop: '#8cb8d6',
     name: 'Tomás Stambulsky',
     shortName: 'Tomás',
     role: 'Tutti founder',
@@ -102,7 +102,7 @@ const roster = [
   },
   {
     handle: 'tdinh_me',
-    backdrop: '#fa998c',
+    backdrop: '#fc9088',
     name: 'Tony Dinh',
     shortName: 'Tony',
     role: 'DevUtils maker',
@@ -113,7 +113,7 @@ const roster = [
   },
   {
     handle: 'rameerez',
-    backdrop: '#fcdb97',
+    backdrop: '#fcdb9b',
     name: 'Javi',
     shortName: 'Javi',
     role: 'Open-source developer',
@@ -123,7 +123,7 @@ const roster = [
   },
   {
     handle: 'FiachraRM',
-    backdrop: '#a0c3c3',
+    backdrop: '#95c5c7',
     name: 'Fiachra MacFadden',
     shortName: 'Fiki',
     role: 'Chengyu Calendar designer',
@@ -133,7 +133,7 @@ const roster = [
   },
   {
     handle: 'praneethpike',
-    backdrop: '#d8b6e1',
+    backdrop: '#dbb6e2',
     name: 'Praneeth Pike',
     shortName: 'Praneeth',
     role: 'Slashspace founder',
@@ -144,7 +144,7 @@ const roster = [
   },
   {
     handle: 'sandrokratz',
-    backdrop: '#a5ac88',
+    backdrop: '#a5b48f',
     name: 'Sandro Kratz',
     shortName: 'Sandro',
     role: 'Tutorbase co-founder',
@@ -155,7 +155,7 @@ const roster = [
   },
   {
     handle: 'odd_joel',
-    backdrop: '#faab7f',
+    backdrop: '#fba97f',
     name: 'IndiJo',
     shortName: 'IndiJo',
     role: 'Moshi maker',
@@ -166,7 +166,7 @@ const roster = [
   },
   {
     handle: 'ayysoni',
-    backdrop: '#9dc7e0',
+    backdrop: '#9ec8e2',
     name: 'Ayush Soni',
     shortName: 'Ayush',
     role: 'Hardware maker',
@@ -177,7 +177,7 @@ const roster = [
   },
   {
     handle: 'yongfook',
-    backdrop: '#c6d39d',
+    backdrop: '#bccf95',
     name: 'Jon Yongfook',
     shortName: 'Jon',
     role: 'Bannerbear founder',
@@ -188,7 +188,7 @@ const roster = [
   },
   {
     handle: 'caitbhri',
-    backdrop: '#abcbcd',
+    backdrop: '#a8cacb',
     name: 'Cait Bahari',
     shortName: 'Cait',
     role: 'Stripe residency host',
@@ -199,7 +199,7 @@ const roster = [
   },
   {
     handle: 'neilhanyd',
-    backdrop: '#fbc8a0',
+    backdrop: '#fbbc96',
     name: 'Neil Han',
     shortName: 'Neil',
     role: 'Engineer and author',
@@ -210,7 +210,7 @@ const roster = [
   },
   {
     handle: 'jesslozanos',
-    backdrop: '#cdb6ce',
+    backdrop: '#cfa6c9',
     name: 'Jess Lozano Schmitt',
     shortName: 'Jess',
     role: 'Stripe residency host',
