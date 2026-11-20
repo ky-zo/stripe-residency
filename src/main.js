@@ -8,12 +8,13 @@ import { createPartyUI } from './party-ui.js';
 import { getFocus, beginFocus, toggleFocus, endFocus } from './focus.js';
 import {createMemberEditor,paintMember} from './member-ui.js';
 import {memberHandle} from '../shared/members.js';
+import {courtSide} from '../shared/sports.js';
 import photoSources from '../photo-sources.json';
 
 const $=id=>document.getElementById(id);
 renderIcons();
 const byHandle=new Map(residents.map(r=>[r.handle,r]));
-let activity=null;
+let activity=null,activitySeat=null;
 const islandActivities={
   josefbuettgen:'Josef swims laps in the cove beside the wooden jetty.',
   odd_joel:'IndiJo stretches out on the terracotta-striped sunbed.',
@@ -33,7 +34,7 @@ const room=createRoom({
   state(state,welcome){
     syncGuestProfile(state);
     if(worldReady)world.applyRoom(state,welcome);
-    updateParty();updateProfileClaim();
+    updateParty();updateProfileClaim();updateSportStatus();
     if(welcome)finishEntry();
   },
   wave(m){world?.wave(m);},ball(b){world?.setBall(b);},correct(p){world?.correct(p);},
@@ -291,19 +292,35 @@ function nearby(item) {
   b.hidden=item?.type!=='resident'&&item?.type!=='activity';
   if(b.hidden)return;
   b.innerHTML=icon(item.type==='resident'?'chat':'sun');
-  b.append(document.createTextNode(item.type==='resident'?'Meet '+item.resident.shortName:({swim:'Take a dip',lounge:'Lounge here',ride:'Ride motorbike',climb:'Climb palm'})[item.id]));
+  b.append(document.createTextNode(item.type==='resident'?'Meet '+item.resident.shortName:({swim:'Take a dip',lounge:'Lounge here',ride:'Ride motorbike',climb:'Climb palm',surf:'Go surfing',boat:'Board the canoe',padel:'Play padel',boulder:'Go bouldering'})[item.id]));
 }
 const clearStick=bindThumbstick($('thumbstick'),(right,forward)=>world?.setStick(right,forward));
 $('jump').addEventListener('click',()=>{world?.jump();host.focus({preventScroll:true});});
+function updateSportStatus(){
+  const el=$('sport-caption');let line='';
+  if(activity==='padel'){
+    const {court,players}=room.get(),shot=court?.shot;
+    const practice=players.filter(p=>courtSide(p.seat)).length<2;
+    line=shot?'Rally '+shot.rally+' · '+(shot.target===courtSide(activitySeat)?'Your return':'Across the net'):(practice?'Solo practice':'Two players')+' · Swing to serve';
+    if(!shot&&court?.best)line+=' · Best '+court.best;
+  }else if(activity==='boulder')line='Up to climb · Down to descend';
+  else if(activity==='surf')line='Steer the board · Pump for speed';
+  else if(activity==='boat')line=activitySeat==='play:boat:bow'?'Bow seat · Riding along':'Helm · Paddle forward and steer';
+  el.hidden=!line;if(el.textContent!==line)el.textContent=line;
+}
 function updateFocus(){
   updateParty();const focus=getFocus();
   $('focus-panel').hidden=!sitting||!focus;$('world-bottom').hidden=sitting&&Boolean(focus);
-  const exits={swim:'Back to shore',lounge:'Get up',climb:'Climb down',ride:'Park motorbike'};
+  const exits={swim:'Back to shore',lounge:'Get up',climb:'Climb down',ride:'Park motorbike',surf:'Off the board',boat:'Hop off',padel:'Leave court',boulder:'Step off'};
   const label=exits[activity]||(focus?'Return to work':'Take a seat');
   play.dataset.activity=activity||'walk';
-  $('jump').hidden=Boolean(sitting||activity);
-  $('thumbstick').hidden=Boolean(sitting||activity==='lounge');
-  document.querySelector('.move-hint span').textContent=({swim:'Tap water to swim · Drag to look',ride:'W / S to drive · A / D to steer',climb:'Up to climb · Down to descend',lounge:'Resting on the sunbed'})[activity]||'Tap to walk · Drag to look';
+  const action=$('jump'),verb=activity==='padel'?'Swing':activity==='surf'?'Pump':'Jump';
+  action.hidden=Boolean(sitting||activity&&!['surf','padel'].includes(activity));
+  action.querySelector('i').innerHTML=icon(activity==='padel'?'padel':activity==='surf'?'surf':'jump');
+  action.querySelector('span').textContent=verb;action.setAttribute('aria-label',verb);action.title=verb+' (Space)';
+  $('thumbstick').hidden=Boolean(sitting||activity==='lounge'||activitySeat==='play:boat:bow');
+  updateSportStatus();
+  document.querySelector('.move-hint span').textContent=({swim:'Tap water to swim · Drag to look',ride:'W / S to drive · A / D to steer',climb:'Up to climb · Down to descend',lounge:'Resting on the sunbed',boat:'Tap water to paddle · Drag to look',surf:'Tap water to steer · Space to pump',padel:'Move to the ball · Space to swing',boulder:'Tap the wall or use up and down'})[activity]||'Tap to walk · Drag to look';
   $('seat').innerHTML=icon(activity?'walk':'coffee')+label;
   if(!focus)return;
   $('focus-time').textContent=Math.floor(focus.seconds/60).toString().padStart(2,'0')+':'+(focus.seconds%60).toString().padStart(2,'0');
@@ -316,7 +333,7 @@ function cameraChanged(wide){
 }
 const callbacks={
   room,onBallNear(value){ballNear=value;updateParty();},label:$('world-label'),youLabel:$('visitor-label'),onResident:openProfile,onNearby:nearby,notice,onCamera:cameraChanged,
-  onActivity(value){activity=value;updateFocus();},
+  onActivity(value,seat){activity=value;activitySeat=seat;updateFocus();},
   onSit(){sitting=true;if(!getFocus())beginFocus();updateFocus();$('world-status').hidden=true;},
   onLeaveSeat(){sitting=false;if(getFocus()?.state==='running')toggleFocus();updateFocus();}
 };
@@ -358,7 +375,7 @@ async function enterWorld(findHandle=null){
 }
 function leaveWorld(){
   ++entryRevision;inWorld=false;worldReady=false;pendingFind=null;world?.stop();room.close();endFocus();requestedClaim=null;
-  activity=null;sitting=false;clearStick();postcard.hidden=false;play.hidden=true;clearTimeout(noticeTimer);
+  activity=null;activitySeat=null;updateSportStatus();sitting=false;clearStick();postcard.hidden=false;play.hidden=true;clearTimeout(noticeTimer);
   document.body.classList.remove('playing');
   if(gameFullscreen&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});
   gameFullscreen=false;

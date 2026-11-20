@@ -105,3 +105,8 @@ body.playing .jump-control{position:absolute;right:max(1.15rem,env(safe-area-ins
  body.playing .thumbstick,body.playing .jump-control{bottom:calc(max(.55rem,env(safe-area-inset-bottom)) + var(--action-height,2.7rem) + .8rem)}
 }
 .dog-label{position:absolute;left:0;top:0;transform:translate(-50%,-100%);pointer-events:none;white-space:nowrap;background:#fff6deeb;color:#4e392b;border:1px solid #a7846055;border-radius:1rem;padding:.12rem .48rem;font-size:.73rem;font-weight:650;line-height:1.2;box-shadow:0 1px 4px #452f2424}
+
+.help-dialog{max-height:88dvh;overflow:auto}
+.help-dialog .activity-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+.sport-caption{position:absolute;z-index:3;left:50%;bottom:calc(max(.85rem,env(safe-area-inset-bottom)) + var(--action-height,2.7rem) + .66rem);transform:translateX(-50%);max-width:calc(100% - 10rem);width:max-content;padding:.34rem .80rem;text-align:center;line-height:1.25;border-radius:.75rem;color:#fff9e9;background:#304b3fee;font-size:.78rem;font-weight:600;pointer-events:none}
+@media(max-width:420px){.help-dialog .activity-list button{font-size:.80rem;padding:.50rem}.sport-caption{font-size:.73rem}}

@@ -1,5 +1,6 @@
 export const SCOOTER_START = {x:1.34,z:5.82,yaw:Math.PI/2};
 export const JUMP_MS = 720;
+export const OCEAN_RADIUS = 100;
 export const SWIM_LEVEL = -.64;
 // Each ring is a fraction of the irregular coast, with its sand height in world units.
 export const BEACH_PROFILE = [
@@ -44,7 +45,8 @@ export function scooterSpot(pose=SCOOTER_START) {
 export function shoreline(angle) {
   const a=Math.atan2(Math.sin(angle),Math.cos(angle));
   const inlet=.136*Math.exp(-(((a+1.315)/.26)**2));
-  return 1+.033*Math.sin(3*a-.45)+.016*Math.sin(6*a+1)+.012*Math.sin(9*a)-inlet;
+  const eastBeach=1.17*Math.max(0,Math.cos(a))**4;
+  return 1+eastBeach+.033*Math.sin(3*a-.45)+.016*Math.sin(6*a+1)+.012*Math.sin(9*a)-inlet;
 }
 
 export const landRadius=(x,z)=>Math.hypot(x/10.35,z/6.66);
@@ -72,7 +74,7 @@ export function groundHeight(x,z) {
   }
   return BEACH_PROFILE.at(-1)[1];
 }
-export const inLagoon=(x,z)=>(x/17.8)**2+(z/14.6)**2<=1;
+export const inLagoon=(x,z)=>x*x+z*z<=OCEAN_RADIUS*OCEAN_RADIUS;
 export function shoreActivity(current,x,z,jumpHeight=0) {
   const depth=SWIM_LEVEL-groundHeight(x,z);
   if(current==='swim')return depth<=STAND_DEPTH?null:'swim';

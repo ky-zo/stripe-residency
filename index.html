@@ -54,6 +54,7 @@
           <button class="jump-control" id="jump" type="button" aria-label="Jump" title="Jump (Space)"><i data-icon="jump"></i><span>Jump</span></button>
           <div id="world-label" class="world-label" hidden></div>
           <div id="visitor-label" class="visitor-label" hidden>You</div>
+          <div id="sport-caption" class="sport-caption" role="status" hidden></div>
           <div id="world-bottom" class="world-bottom">
             <p class="move-hint"><i data-icon="pointer"></i><span>Tap to walk <b>·</b> Drag to look</span></p>
             <button type="button" id="interact" class="world-control context" hidden></button>
@@ -119,14 +120,18 @@
       <button class="round-btn modal-close" aria-label="Close controls" id="close-help" type="button"><i data-icon="close"></i></button>
       <h2 id="help-title">Around the island</h2>
       <div id="activity-list" class="activity-list">
+        <button type="button" data-activity="boulder"><i data-icon="boulder"></i>Go bouldering</button>
+        <button type="button" data-activity="surf"><i data-icon="surf"></i>Go surfing</button>
+        <button type="button" data-activity="padel"><i data-icon="padel"></i>Play padel</button>
+        <button type="button" data-activity="boat"><i data-icon="boat"></i>Board the canoe</button>
         <button type="button" data-activity="swim"><i data-icon="swim"></i>Take a swim</button>
         <button type="button" data-activity="climb"><i data-icon="island"></i>Climb a palm tree</button>
         <button type="button" data-activity="ride"><i data-icon="motorbike"></i>Ride the motorbike</button>
         <button type="button" data-activity="lounge"><i data-icon="sun"></i>Lounge on the sunbed</button>
         <button type="button" data-activity="desk"><i data-icon="coffee"></i>Work at a table</button>
       </div>
-      <p>Tap a destination or move with the joystick, arrow keys or <kbd>WASD</kbd>. Drag to look around. Wade in up to your knees to swim. Ride the scooter into the sea and it returns to its parking spot. Steer with left or right. Climb palms with up or down.</p>
-      <p><kbd>Space</kbd> jumps, <kbd>Q</kbd> waves and <kbd>E</kbd> interacts. Tap any portrait above the island to meet that resident.</p>
+      <p>Tap a destination or move with the joystick, arrow keys or <kbd>WASD</kbd>. Drag to look around. Wade in up to your knees to swim. Ride the scooter into the sea and it returns to its parking spot. Steer with left or right. Climb the rock or a palm with up and down.</p>
+      <p><kbd>Space</kbd> jumps on land, pumps the surfboard or swings a padel racket. <kbd>Q</kbd> waves and <kbd>E</kbd> interacts. Tap any portrait above the island to meet that resident.</p>
     </dialog>
     <script type="module" src="/src/main.js"></script>
   </body>

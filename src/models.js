@@ -740,7 +740,19 @@ function buildPieces(studio,look,expression) {
 }
 
 const guestHair={short:'swept',wavy:'parted',long:'layered',buzz:'shaved'};
-const activities=new Set(['lounge','swim','read','work','stretch','photograph','climb','ride','jump']);
+const activities=new Set(['lounge','swim','read','work','stretch','photograph','climb','ride','jump',
+  'surf','boat','boat-passenger','boulder','padel']);
+
+// The origin is the lower hand. The long blade can reach the water from either bench.
+function drawCanoePaddle(p) {
+  p.loft('#bb895d',[[-.76,.020,.018],[-.57,.022,.021],[.23,.019,.020],[.304,.020,.021]],12);
+  p.oval('#d9aa76',0,.315,0,.064,.025,.025);
+  p.loft('#e9b979',[[-1.068,.010,.008],[-1.049,.060,.017],[-1.006,.091,.019],
+    [-.911,.104,.024],[-.817,.083,.025],[-.718,.047,.024],[-.659,.019,.020]],16);
+  p.loft('#537e75',[[-1.07,.009,.010],[-1.056,.047,.017],[-1.032,.078,.022],[-1.010,.094,.022]],16);
+  p.stroke('#d09962',[[0,-1.036,.019],[0,-.925,.026],[0,-.810,.027],[0,-.683,.021]],.006,.4,11,6);
+  for(const y of [-.047,.015]) p.loft('#977252',[[y,.022,.022],[y+.020,.022,.022]],10);
+}
 const swatch=(value,fallback)=>typeof value==='string'&&/^#[\da-f]{6}$/i.test(value)?value.toLowerCase():fallback;
 
 function customPieces(studio,library,look,expression) {
@@ -862,6 +874,11 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
   const hash=Array.from(id).reduce((sum,c)=>sum+c.charCodeAt(0)*.149,0);
   const aim=new T.Vector3(),rotation=new T.Quaternion();
   const wrist=new T.Vector3(),poseInverse=new T.Quaternion();
+  const rightHand=new T.Group();
+  rightHand.name='Right hand grip';
+  pose.add(rightHand);
+  const paddleHand=new T.Vector3(),paddleAxis=new T.Vector3(),up=new T.Vector3(0,1,0);
+  const racketEuler=new T.Euler(0,0,0,'YXZ'),sole=new T.Vector3();
   const signature=keepsakePoses[look.prop];
   const contextProps=new Map();
   let palm=null,lastActivity='';
@@ -872,11 +889,11 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
   }
   // A grip is anchored to the vehicle or the bark while the body moves behind it.
   // Only the shoulder-to-palm distance changes. The hand retains its round width.
-  function grip(limb,x,y,z) {
+  function grip(limb,x,y,z,minLength=.80) {
     aim.set(x,y,z).sub(pose.position).applyQuaternion(poseInverse).sub(limb.arm.position);
     const arm=limb.arm;
     const lengthY=Math.sqrt(Math.max(0,aim.lengthSq()-.073**2-.089**2));
-    arm.scale.y=T.MathUtils.clamp(lengthY/.260,.80,1.62);
+    arm.scale.y=T.MathUtils.clamp(lengthY/.260,minLength,1.62);
     wrist.set(limb.side*.073,-.260*arm.scale.y,.089).normalize();
     arm.quaternion.setFromUnitVectors(wrist,aim.normalize());
   }
@@ -886,17 +903,20 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
     torso.geometry=activity?pieces.bare:pieces.body;
     if(clearProp) clearProp.visible=!activity;
     for(const item of contextProps.values()) item.visible=false;
-    const prop=activity==='read'?'reading':activity==='photograph'?'camera':null;
+    const prop=activity==='read'?'reading':activity==='photograph'?'camera':activity==='boat'?'paddle':null;
     if(!prop) return;
     let item=contextProps.get(prop);
     if(!item) {
       const key='activity-prop/'+prop;
       if(!library.has(key)) {
-        const drawing=new studio.Part();makeProp(drawing,prop);library.set(key,drawing.finish());
+        const drawing=new studio.Part();
+        if(prop==='paddle') drawCanoePaddle(drawing); else makeProp(drawing,prop);
+        library.set(key,drawing.finish());
       }
-      item=mesh(library.get(key),pose);item.name='Activity '+prop;contextProps.set(prop,item);
+      item=mesh(library.get(key),prop==='paddle'?root:pose);item.name='Activity '+prop;contextProps.set(prop,item);
     }
     item.visible=true;
+    if(prop==='paddle') return;
     const reading=prop==='reading';
     item.position.set(reading?0:.025,reading?.687:.982,reading?.255:.265);
     item.rotation.set(reading?.91:-.09,reading?Math.PI:0,reading?0:-.05);
@@ -904,23 +924,38 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
   }
   let walkWeight=0,seatWeight=0,previousTime,jumpStart=0;
   let travelPhase=hash%2<1?.85:Math.PI+.85;
-  function animate(time=0,walking=false,seated=false,wave=0,activity='') {
+  let paddlePhase=.23,forehandStart=-Infinity,padelPressed=false;
+  function animate(time=0,walking=false,seated=false,wave=0,activity='',progress=0) {
     activity=activities.has(activity)?activity:'';
     if(activity==='jump'&&lastActivity!=='jump') jumpStart=time;
+    if(activity==='padel'&&lastActivity!=='padel') {forehandStart=-Infinity;padelPressed=false;}
     changeActivity(activity);
-    const climbing=activity==='climb',riding=activity==='ride',jumping=activity==='jump';
+    const bouldering=activity==='boulder',climbing=activity==='climb'||bouldering;
+    const riding=activity==='ride',jumping=activity==='jump',surfing=activity==='surf';
+    const paddling=activity==='boat',boating=paddling||activity==='boat-passenger',padel=activity==='padel';
+    const topOut=bouldering?T.MathUtils.clamp(Number(progress)||0,0,1):0;
+    const mantle=topOut?T.MathUtils.smoothstep(topOut,.47,.74):0;
+    const stand=topOut?T.MathUtils.smoothstep(topOut,.80,.995):0;
+    const crouch=mantle*(1-stand);
     const traveling=climbing||riding;
-    const sitting=(seated&&!traveling&&!jumping)||activity==='read'||activity==='work'||activity==='lounge';
+    const sitting=boating||(seated&&!traveling&&!jumping&&!surfing&&!padel)||activity==='read'||activity==='work'||activity==='lounge';
     const delta=previousTime===undefined?1:Math.max(0,Math.min(.16,time-previousTime));
     previousTime=time;
     const ease=1-Math.exp(-delta*15);
     const movement=T.MathUtils.clamp(Number(walking)||0,-1,1);
-    const targetWalk=sitting?0:traveling?Math.abs(movement):Math.max(0,movement);
+    const targetWalk=traveling||paddling||surfing?Math.abs(movement):sitting?0:Math.max(0,movement);
     walkWeight+=(targetWalk-walkWeight)*ease;
     seatWeight+=(Number(Boolean(sitting))-seatWeight)*ease;
     if(traveling&&movement) {
-      travelPhase=(travelPhase+delta*(climbing?4.5:7.3)*walkWeight*Math.sign(movement))%tau;
+      travelPhase=(travelPhase+delta*(bouldering?3.8:climbing?4.5:7.3)*walkWeight*Math.sign(movement))%tau;
     }
+    if(paddling&&movement) paddlePhase=(paddlePhase+delta*3.65*walkWeight*Math.sign(movement))%tau;
+    if(padel&&movement>.10&&(!padelPressed||time-forehandStart>.75)&&time-forehandStart>.38) forehandStart=time;
+    if(padel) padelPressed=movement>.10;
+    const shot=padel?Math.min(1,(time-forehandStart)/.55):1;
+    const windup=padel?Math.sin(Math.PI*Math.min(1,shot/.38)):0;
+    const contact=padel?Math.sin(Math.PI*T.MathUtils.clamp((shot-.19)/.56,0,1)):0;
+    const follow=padel?T.MathUtils.smoothstep(shot,.28,.64)*(1-T.MathUtils.smoothstep(shot,.68,1)):0;
     const greeting=Math.max(0,Math.min(1,Number(wave)||0));
     const shake=Math.sin(time*14+hash);
     const reach=Math.cos(time*6.4+hash);
@@ -930,6 +965,8 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
     const tuck=jumping?Math.sin(airborne*Math.PI):0;
     const pushOff=jumping?Math.max(0,1-airborne/.18):0;
     const landing=jumping?Math.max(0,1-Math.abs(airborne-.88)/.12):0;
+    const strokeFront=paddling?Math.sin(paddlePhase):0;
+    const recovery=paddling?Math.max(0,Math.cos(paddlePhase))*walkWeight:0;
     pose.position.x=0;
     pose.position.y=.004*(1+breath)+Math.abs(step)*.032*walkWeight-.015*seatWeight;
     pose.position.z=0;
@@ -965,9 +1002,24 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
     } else if(climbing) {
       pose.position.set(.024*stridePhase,.031+.012*walkWeight*Math.cos(2*travelPhase),.027);
       pose.rotation.set(-.058,.038*stridePhase,-.052*stridePhase);
-      head.position.z=-.086;
+      if(bouldering) {
+        pose.position.x+=.040*stridePhase;
+        pose.rotation.y+=.114*stridePhase;
+        pose.rotation.z-=.038*stridePhase;
+      }
+      head.position.z=bouldering?-.101:-.086;
       head.rotation.x=-.29+.040*Math.cos(travelPhase);
       head.rotation.y=.12*stridePhase;
+      if(mantle) {
+        pose.position.x*=1-mantle;pose.position.z=.027*(1-mantle)+.016*crouch;
+        const transfer=.064*Math.sin(Math.PI*T.MathUtils.clamp((topOut-.79)/.21,0,1));
+        pose.position.y=T.MathUtils.lerp(pose.position.y,-.098*crouch+.016*stand+transfer,mantle);
+        pose.rotation.set(T.MathUtils.lerp(pose.rotation.x,.52*crouch+.018*stand,mantle),
+          pose.rotation.y*(1-mantle),pose.rotation.z*(1-mantle));
+        head.position.z*=1-mantle;
+        head.rotation.set(T.MathUtils.lerp(head.rotation.x,.11*crouch-.055*stand,mantle),
+          head.rotation.y*(1-mantle)+.065*stand*breath,head.rotation.z);
+      }
     } else if(riding) {
       // Keep the hips over a 0.64-high saddle through the forward lean.
       const lean=.070+.050*walkWeight;
@@ -981,13 +1033,36 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
       pose.rotation.set(-.088*tuck+.070*pushOff+.095*landing,0,.052*tuck);
       head.rotation.x=-.17*tuck+.045*pushOff+.087*landing;
       head.rotation.z-=.058*tuck;
+    } else if(surfing) {
+      const bank=Math.sin(time*1.85+hash);
+      pose.rotation.set(.085+.030*walkWeight,1.24+.09*bank,-.024*bank);
+      head.rotation.y=-.79+.062*bank;
+      head.rotation.x=-.06+.018*breath;
+      head.rotation.z-=.063*bank;
+    } else if(boating) {
+      const lean=paddling?.085+.088*strokeFront:.005+.019*breath;
+      pose.rotation.set(lean,paddling?.20+.16*strokeFront:-.09,paddling?-.046-.020*recovery:.010*breath);
+      pose.position.set(paddling?.043:0,.410-.407*Math.cos(lean),-.407*Math.sin(lean));
+      head.rotation.y=paddling?-.15+.075*strokeFront:.20+.16*Math.sin(time*.68+hash);
+      head.rotation.x=-.72*lean;
+      if(paddling) {
+        paddleHand.set(.350+.024*recovery,.549+.035*recovery,.18+.150*strokeFront);
+        paddleAxis.set(-.48,.86-.36*recovery,-.055-.30*strokeFront-.84*recovery).normalize();
+        const paddle=contextProps.get('paddle');
+        paddle.position.copy(paddleHand);paddle.quaternion.setFromUnitVectors(up,paddleAxis);
+      }
+    } else if(padel) {
+      pose.position.set(-.016-.018*windup+.048*follow,-.052-.014*windup,.014);
+      pose.rotation.set(.090+.060*contact,.10-.43*windup+.50*follow,-.025+.054*follow);
+      head.rotation.y=-pose.rotation.y*.63;head.rotation.x=-.065+.027*contact;
     }
-    if(traveling) poseInverse.copy(pose.quaternion).invert();
+    if(traveling||paddling||padel) poseInverse.copy(pose.quaternion).invert();
     const blink=(time+hash)%(4.2+(hash%1.5));
     const resting=activity==='lounge';
     const delighted=greeting>.71||(jumping&&airborne>.25&&airborne<.74);
     eyes.geometry=resting?pieces.sleep:delighted?pieces.happy:pieces.eyes;
     eyes.scale.y=(resting||delighted)?1:blink<.17?.11+.89*Math.min(1,Math.abs(blink-.085)/.065):1;
+    let soleHeights=0;
     for(const limb of limbs) {
       const {arm,thigh,shin,side}=limb;
       const stride=step*side;
@@ -1028,11 +1103,29 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
         const high=side*stridePhase;
         const release=Math.max(0,side*Math.cos(travelPhase))*walkWeight;
         // Opposite knee and hand rise together. The lifted hand clears the bark to regrip.
-        grip(limb,side*(.140+.032*release),.938+.120*high,.303-.043*release);
-        thigh.rotation.x=-.96+.39*high;
-        thigh.rotation.z=side*(.22+.035*release);
-        shin.rotation.x=.86-.40*high;
+        if(bouldering) {
+          const rimY=T.MathUtils.clamp(.975-(topOut-.55)*2.76,.19,.98);
+          const limit=rimY+.21*(1-T.MathUtils.smoothstep(topOut,.445,.537));
+          const handY=T.MathUtils.lerp(Math.min(.946+.153*high,limit),rimY,mantle);
+          const lipDepth=T.MathUtils.lerp(.283-.067*release,.50,mantle);
+          grip(limb,side*T.MathUtils.lerp(.224+.054*release,.288,mantle),
+            T.MathUtils.lerp(handY,.561+.008*breath,stand),
+            T.MathUtils.lerp(lipDepth,.092,stand),.80-.38*mantle);
+        } else grip(limb,side*(.140+.032*release),.938+.120*high,.303-.043*release);
+        thigh.rotation.x=(bouldering?-1.05:-.96)+.39*high;
+        thigh.rotation.z=side*((bouldering?.45:.22)+.035*release);
+        shin.rotation.x=(bouldering?1.02:.86)-.40*high;
         shin.rotation.z=-side*.12;
+        if(mantle) {
+          thigh.rotation.x=T.MathUtils.lerp(thigh.rotation.x,-(1.02+.26*side)*crouch-.104*stand,mantle);
+          thigh.rotation.z=T.MathUtils.lerp(thigh.rotation.z,side*(.28*crouch+.075*stand),mantle);
+          shin.rotation.x=T.MathUtils.lerp(shin.rotation.x,(1.78+.13*side)*crouch+.17*stand,mantle);
+          shin.rotation.z*=1-.63*mantle;
+          if(side>0) {
+            const lead=T.MathUtils.smoothstep(topOut,.585,.767)*(1-T.MathUtils.smoothstep(topOut,.835,.98));
+            thigh.rotation.x-=.84*lead;shin.rotation.x+=1.10*lead;
+          }
+        }
       } else if(riding) {
         grip(limb,side*.29,.925,.400);
         thigh.rotation.x=-1.00+.018*stridePhase*side*walkWeight;
@@ -1046,6 +1139,32 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
         shin.rotation.x=(side>0?1.66:1.29)*tuck+.56*pushOff+.85*landing;
         arm.rotation.x=-.17-(.45+.13*side)*tuck+.31*pushOff+.20*landing;
         arm.rotation.z=side*(.26+(1.50+.27*side)*tuck+.24*landing);
+      } else if(surfing) {
+        const bend=.57+.16*walkWeight+.048*breath;
+        thigh.rotation.x=-bend+.044*side;
+        thigh.rotation.z=side*.42;
+        shin.rotation.x=1.55*bend-.058*side;
+        shin.rotation.z=-side*.02;
+        arm.scale.y=1.26;
+        aimHand(limb,side*.63,.843-side*(.083+.040*breath),.078+.048*side);
+        sole.set(0,-.2935,.035).applyQuaternion(shin.quaternion).add(shin.position)
+          .applyQuaternion(thigh.quaternion).add(thigh.position).applyQuaternion(pose.quaternion);
+        limb.deckHeight=sole.y;soleHeights+=sole.y;
+      } else if(boating) {
+        thigh.rotation.x=-1.27;thigh.rotation.z=side*.20;
+        shin.rotation.x=1.02;shin.rotation.z=-side*.095;
+        if(paddling) {
+          const along=side<0?.32:0;
+          grip(limb,paddleHand.x+paddleAxis.x*along,paddleHand.y+paddleAxis.y*along,paddleHand.z+paddleAxis.z*along);
+        } else aimHand(limb,side*.17,.586,.197);
+      } else if(padel) {
+        thigh.rotation.x=-.46+side*(.091+.14*follow);
+        thigh.rotation.z=side*(.31+.035*windup);
+        shin.rotation.x=.81-side*(.10+.14*follow);
+        shin.rotation.z=-side*.047;
+        if(side<0) grip(limb,-.319-.079*windup+.322*follow,
+          .682+.047*windup+.192*follow,.155-.166*windup+.227*contact+.105*follow);
+        else aimHand(limb,.303+.048*windup+.054*follow,.714+.075*contact,.206-.136*follow);
       }
       if(side<0 && greeting>0) {
         // Trace a broad arc around the shoulder while keeping the open palm raised.
@@ -1071,9 +1190,26 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
         palm.rotation.set(-.12-.12*shake,-.19+.29*Math.cos(time*14+hash),.3*shake);
         palm.scale.setScalar(greeting);
       }
+      if(side<0) {
+        rightHand.position.set(-.073,-.260,.089).multiply(arm.scale).applyQuaternion(arm.quaternion).add(arm.position);
+        if(padel) {
+          racketEuler.set(.30+.38*contact-.33*windup,-.14-.68*windup+.82*follow,.92+.67*windup-1.57*follow);
+          rightHand.quaternion.setFromEuler(racketEuler).premultiply(poseInverse);
+        } else rightHand.quaternion.copy(arm.quaternion);
+      }
+    }
+    if(surfing) {
+      const average=soleHeights/2;
+      pose.position.y=-average-.004;
+      // A small extension at either ankle keeps both soles planted through the bank.
+      for(const limb of limbs) {
+        sole.set(0,-.2935,0).applyQuaternion(limb.shin.quaternion)
+          .applyQuaternion(limb.thigh.quaternion).applyQuaternion(pose.quaternion);
+        limb.shin.scale.y+=(average-limb.deckHeight)/sole.y;
+      }
     }
     if(palm) palm.visible=greeting>.025;
   }
   animate(0);
-  return {root,animate};
+  return {root,animate,rightHand};
 }

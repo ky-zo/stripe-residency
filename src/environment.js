@@ -174,7 +174,8 @@ function makeWater(T, root) {
         vec2 p = worldXZ;
         float angle = atan(p.y / 8.15, p.x / 11.7);
         float bayAngle=(angle+1.315)/.26;
-        float edge = 1.0 + .033*sin(3.0*angle-.45) + .016*sin(6.0*angle+1.0) + .012*sin(9.0*angle) - .136*exp(-bayAngle*bayAngle);
+        float eastBeach = 1.17 * pow(max(0.0,cos(angle)),4.0);
+        float edge = 1.0 + eastBeach + .033*sin(3.0*angle-.45) + .016*sin(6.0*angle+1.0) + .012*sin(9.0*angle) - .136*exp(-bayAngle*bayAngle);
         float radius = length(p / vec2(11.7,8.15)) / edge;
         float shoal = 1.0 - smoothstep(1.12,1.62,radius + .024*sin(p.x*.75));
         float tint = sin(p.x*.24+p.y*.48)*.045 + sin(p.y*.7-p.x*.16)*.025;
@@ -198,7 +199,7 @@ function makeWater(T, root) {
         #include <colorspace_fragment>
       }`,
   });
-  const mesh = new T.Mesh(new T.PlaneGeometry(740, 740), material);
+  const mesh = new T.Mesh(new T.PlaneGeometry(1100, 1100), material);
   mesh.name = 'Lagoon and shallows';
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = WATER_Y;
@@ -959,39 +960,6 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
   }
   pennants();
 
-  function jukung(x,z,angle,scale) {
-    const hull=makeBatch(T,'Jukung outrigger canoe');
-    const profile=(t, side, low=false)=>{
-      const s=Math.sin(Math.PI*t);
-      return [(t-.5)*3.48, (low ? -.15 : .15) + .21*Math.pow(Math.abs(t-.5)*2,2.8), side*Math.pow(Math.max(0,s),.68)*(low ? .20 : .35)];
-    };
-    for(let i=0;i<14;i++) {
-      const t0=i/14,t1=(i+1)/14;
-      for(const side of [-1,1]) {
-        const p0=profile(t0,side),p1=profile(t1,side),d0=profile(t0,side,true),d1=profile(t1,side,true);
-        hull.quad(p0,p1,d1,d0,i<2||i>11 ? '#c96b45' : '#e9d7a6');
-        const stripe=(p,d,f)=>p.map((v,k)=>lerp(v,d[k],f));
-        hull.quad(stripe(p0,d0,.13),stripe(p1,d1,.13),stripe(p1,d1,.33),stripe(p0,d0,.33),'#477e75');
-        hull.quad(p0,p1,profile(t1,0,true),profile(t0,0,true),'#ba8c55');
-      }
-    }
-    for (const xx of [-.67,.65]) {
-      block(hull,'#c69c6a',xx,.10,0,.24,.08,.61);
-      for(const side of [-1,1]) {
-        stick(hull,'#b99462',[xx,.12,side*.26],[xx,.22,side*.84],.034);
-        stick(hull,'#bb9b66',[xx,.22,side*.84],[xx,.03,side*1.08],.035);
-      }
-    }
-    for(const side of [-1,1]) {
-      ball(hull,'#d1b784',0,.035,side*1.08,1.22,.074,.085);
-      stick(hull,'#6c8670',[-1.16,.04,side*1.08],[-1.26,.105,side*1.08],.039);
-    }
-    const mesh=hull.finish(clay,root,false);
-    mesh.position.set(x,-.59,z); mesh.rotation.y=angle; mesh.scale.setScalar(scale);
-    animated.push(t=>{ mesh.position.y=-.59+.036*Math.sin(t*1.02+.7); mesh.rotation.x=.034*Math.sin(t*.78); mesh.rotation.z=.024*Math.cos(t*.81); });
-  }
-  jukung(-13.2,-3.40,-.68,.83);
-
   // Far-off headlands are shallow open profiles both to keep their silhouette calm
   // and to keep the horizon out of the way of the little island.
   const distance = makeBatch(T,'Distant Bali headlands');
@@ -1014,6 +982,9 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
     }
   }
   const oceanHills=distance.finish(grain,root,false);
+  // Keep the painted headlands beyond the navigable water in every direction.
+  oceanHills.scale.setScalar(4);
+  oceanHills.position.y=WATER_Y*(1-oceanHills.scale.y);
   oceanHills.receiveShadow=false;
 
   landscape.finish(grain,root,false);

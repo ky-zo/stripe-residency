@@ -4,9 +4,10 @@ const directions = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
 const squared = (a, b) => (a.x-b.x)**2 + (a.z-b.z)**2;
 
 export function createNavigation(obstacles, residents, options={}) {
-  const {step:STEP=.45,width:WIDTH=81,height:HEIGHT=67,clearance=.24}=options;
+  const {step:STEP=.45,width:WIDTH=113,height:HEIGHT=67,clearance=.24,passable=inLagoon}=options;
+  // Only the furnished island needs a grid. Open-water routes use straight segments.
   function canStand(x,z) {
-    if (!inLagoon(x,z)) return false;
+    if (!passable(x,z)) return false;
     if (obstacles.some(o => Math.abs(x-o.x) < o.w/2+clearance && Math.abs(z-o.z) < o.d/2+clearance)) return false;
     return !residents.some(p => (x-p.x)**2 + (z-p.z)**2 < .50**2);
   }

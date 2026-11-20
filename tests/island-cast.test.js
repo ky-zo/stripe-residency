@@ -16,6 +16,9 @@ test('PowPow is one playable resident with a link-free character card',()=>{
 test('both small island dogs run the same dry paths for every visitor',()=>{
   const dogs=createIslandDogs(T);
   assert.deepEqual(dogs.map(d=>d.name),['PowPow2','Poopi']);
+  const [small,full]=dogs.map(d=>new T.Box3().setFromObject(d.root).getSize(new T.Vector3()));
+  assert.ok(small.y<full.y*.9&&small.z<full.z*.85);
+  assert.ok(full.y>.49&&full.y<.58);
   for(const dog of dogs){
     const initial=new T.Box3().setFromObject(dog.root);
     assert.ok(initial.max.y>.35&&initial.max.y<.90);

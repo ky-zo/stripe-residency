@@ -1,4 +1,5 @@
 import { initialBall } from '../shared/ball.js';
+import {isBoatSeat} from '../shared/sports.js';
 
 export function createRoom(events) {
   let socket=null,wanted=false,tries=0,attempt=0,retry,heartbeat,admissionTimer,offset=0,hasTime=false;
@@ -71,11 +72,11 @@ export function createRoom(events) {
       syncTime(m.serverTime);
       if(m.type==='welcome'){
         clearTimeout(admissionTimer);tries=0;
-        state={status:'online',ownId:m.id,players:m.players,claims:m.claims,members:m.members||[],ball:m.ball,scooter:m.scooter};
+        state={status:'online',ownId:m.id,players:m.players,claims:m.claims,members:m.members||[],ball:m.ball,scooter:m.scooter,boat:m.boat,court:m.court};
         lastSent=null;lastSendAt=0;syncGuest();events.state(state,true);sendGuest();
         clearInterval(heartbeat);heartbeat=setInterval(()=>send({type:'ping'}),18000);
       }else if(m.type==='state'){
-        state={...state,players:m.players,claims:m.claims,members:m.members||[],ball:m.ball,scooter:m.scooter};syncGuest();events.state(state);
+        state={...state,players:m.players,claims:m.claims,members:m.members||[],ball:m.ball,scooter:m.scooter,boat:m.boat,court:m.court};syncGuest();events.state(state);
       }else if(m.type==='guestResult'){
         const request=pendingGuest;
         if(!request||request.op!==m.op)return;
@@ -83,6 +84,10 @@ export function createRoom(events) {
         request.resolve(guest);
       }else if(m.type==='move'){
         const who=state.players.find(p=>p.id===m.id);if(who)Object.assign(who,{x:m.x,z:m.z,yaw:m.yaw,progress:m.progress||0,walking:m.walking,at:m.at});
+        if(m.boat){
+          state.boat=m.boat;
+          for(const p of state.players)if(isBoatSeat(p.seat))Object.assign(p,m.boat,{walking:m.walking,at:m.at});
+        }
         events.move?.(m);
       }else if(m.type==='jump'){
         const who=state.players.find(p=>p.id===m.id);if(who)who.jumpAt=m.at;

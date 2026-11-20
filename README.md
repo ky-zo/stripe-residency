@@ -6,13 +6,17 @@ Entering fills the screen with the island. The floating resident strip opens pro
 
 Open **Activities** or tap a place in the world to swim from the cove, climb a coconut palm, ride the teal QuackParty motorbike, lounge on a sunbed, or work at a table. Walk down the beach and wade into the shallows. At knee depth your figure starts swimming. Swim back toward the sand to stand up again. Push up or down on a palm to change your grip. On the bike, forward accelerates, backward brakes and reverses, and left or right steers. **Park motorbike** leaves it for the next rider. Drive into the surf and you start swimming where you splashed in. The shared scooter returns to its island parking spot.
 
+The eastern beach has a bouldering problem and a padel court. Use up and down or tap the boulder to move between holds. On the court, move into position and press **Swing** or Space. Practice against the far wall alone or rally across the net with a friend. The court tracks your rally and the room’s best.
+
+Pick **Go surfing** to ride from the board rack. Steer with the joystick, keyboard, or a tap on the water. **Pump** or Space catches a swell. The outrigger canoe seats two. The helm paddles and steers, and the passenger takes over when the skipper hops off. Swimmers can reboard alongside the hull. The canoe returns to its mooring after the crew has left the area. The open ocean extends 100 world units from the island center in every direction. **Back to shore** swims you home.
+
 ## Run locally
 
 Use Node 22.12 or later. Run `npm ci`, then `npm run dev`. The development command starts Vite and a local Workers runtime. Open the printed Vite URL in separate browser profiles to play as different people.
 
 ## The shared room
 
-The Cloudflare Worker serves the website and upgrades `/live` to a WebSocket. All connections route to one named Durable Object. It keeps players, guest details and character claims in memory for active connections. The shared beach ball and parked motorbike use the toys table. The room shares swimmer and rider positions, climbing progress and jump timing. Multiple players can swim together. Each climbable palm, work seat, the spare sunbed and the motorbike have one occupant at a time.
+The Cloudflare Worker serves the website and upgrades `/live` to a WebSocket. All connections route to one named Durable Object. It keeps players, guest details and character claims in memory for active connections. The shared beach ball and parked motorbike use the toys table. The canoe crew, padel rally and court record last for the active room. The room shares swimmer and rider positions, climbing progress and jump timing. Multiple players can swim together. Each climbable palm, work seat, the spare sunbed and the motorbike have one occupant at a time.
 
 Disconnecting releases the player's character and seat. An open tab can reintroduce its guest during a network interruption using its current page memory. Select Invite to copy the shared link. Everyone who has the invitation can join.
 
