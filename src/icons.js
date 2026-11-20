@@ -1,0 +1,28 @@
+const shapes = {
+  sunmark: '<path d="M5 20c2.8-2.2 5.3-2.3 8.1-.4s5.3 2 8.1.2 5.5-2 9.8 0M7 25.2c2.5-1.5 4.7-1.4 7 .1 2.4 1.5 5 1.5 7.4 0 2.3-1.5 4.6-1.6 7.2-.2M10.8 15.1a7.2 7.2 0 0 1 14.4.2M18 1.8V5m-9.3-.2 2.1 2.8m16.5-2.8-2.1 2.8M3.4 11.4l3.3 1.3m25.9-1.3-3.3 1.3"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M19 5l-1.5 1.5m-11 11L5 19"/>',
+  mute:'<path d="M3 9h4l5-4v14l-5-4H3zM17 9l5 6m0-6-5 6"/>',
+  sound:'<path d="M3 9h4l5-4v14l-5-4H3zM16 8.5a5 5 0 0 1 0 7m3-10a9 9 0 0 1 0 13"/>',
+  walk:'<circle cx="14.2" cy="4.6" r="1.7"/><path d="m7 13 1.6-4 3.9-1.4 2.4 4.1 3.4 1.3M12.5 8l-1.6 6 3.2 3.2 1.2 4M11 14l-2 3.6L6.6 21"/>',
+  pin:'<path d="M19 10c0 5.1-7 11-7 11S5 15.1 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.1"/>',
+  flower:'<path d="M12 9c-1.7-5 1.4-8 3.7-6.3 2.2 1.7.1 5.4-2.1 7.3 4.3-3.1 8.2-1.6 7.3 1.2-.9 2.8-4.8 3-7.4 1.7 4.5 2.5 4.5 6.9 1.6 7.3-2.8.4-4.1-3.7-3.7-6.2-1.5 5-5.3 6.3-6.6 3.8-1.3-2.6 2-5.1 4.6-5.8-5 .4-7.5-2.7-5.2-4.5 2.1-1.8 5.4-.3 7.8 1.5Z"/><circle cx="12" cy="11.6" r="1.4"/>',
+  grid:'<rect x="3.5" y="3.5" width="6" height="6" rx="1.3"/><rect x="14.5" y="3.5" width="6" height="6" rx="1.3"/><rect x="3.5" y="14.5" width="6" height="6" rx="1.3"/><rect x="14.5" y="14.5" width="6" height="6" rx="1.3"/>',
+  row:'<rect x="3" y="7" width="5" height="10" rx="1.4"/><rect x="10" y="7" width="5" height="10" rx="1.4"/><path d="M18 7h3v10h-3"/>',
+  island:'<path d="M3 17q4-3 8-1t10-1M5 20q3-1.8 6-.3t8-.3M10 14c.3-3.9 1-7.3 2.3-10.1m-.1 1C10 1.3 7 2.4 5.6 4.9c2.4-.9 4.4.1 6.2 1.1m.6-1.3c1-3 4-3.2 6.8-1-2.8-.2-5 .9-6.9 2m-.2-.4c3-1.1 5.3.8 6.2 3.2-2-1.6-3.8-2.3-6-2.5"/>',
+  aperture:'<path d="m8 3-5 0v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><circle cx="12" cy="12" r="3"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.2 9a2.9 2.9 0 0 1 5.7.4c0 2.1-2.9 2.3-2.9 4.3m0 2.5v.2"/>',
+  coffee:'<path d="M4 8h12v6a5.5 5.5 0 0 1-5.5 5.5h-1A5.5 5.5 0 0 1 4 14zM16 8h2a3 3 0 0 1 0 6h-2M7 3v2m4-3v3m-9 16h17"/>',
+  pointer:'<path d="m4 3 6 17 2.5-7.5L20 10 4 3Z"/>',
+  close:'<path d="m6 6 12 12M18 6 6 18"/>',
+  sparkle:'<path d="m13 2 2.5 6.5L22 11l-6.5 2.5L13 20l-2.5-6.5L4 11l6.5-2.5L13 2ZM4.8 16.2l.9 2.1 2.1.9-2.1.8-.9 2.1-.8-2.1-2.1-.8 2.1-.9.8-2.1Z"/>',
+  cube:'<path d="m12 2 8.5 5v10l-8.5 5-8.5-5V7zM3.5 7 12 12l8.5-5M12 12v10"/>',
+  download:'<path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4"/>',
+  chat:'<path d="M20.5 11a8 8 0 0 1-8.5 8 10 10 0 0 1-3.2-.5l-5 2 1.4-4.6A7.5 7.5 0 0 1 3.5 11a8.5 8.5 0 0 1 17 0Z"/>'
+};
+export function icon(name) {
+  const viewBox = name === 'sunmark' ? '0 0 36 29' : '0 0 24 24';
+  return '<svg aria-hidden="true" viewBox="'+viewBox+'" fill="none" stroke="currentColor" stroke-width="'+(name === 'sunmark' ? '2' : '1.7')+'" stroke-linecap="round" stroke-linejoin="round">'+shapes[name]+'</svg>';
+}
+export function renderIcons() {
+  document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML=icon(el.dataset.icon); });
+}

@@ -1,0 +1,115 @@
+{
+  "method": "Built-in GPT ImageGen",
+  "cover": "Create an extremely wide cinematic landscape hero image, 3:1 or wider if possible, for a tiny playable 3D Balinese maker residency world called Palm Hours. No lettering, logos, UI or text anywhere. This is a bespoke art-directed photograph of an exquisitely hand-made miniature coastal diorama, charming high-end stop-motion set, carefully sculpted matte clay, handmade paper tropical leaves and carved wood, warm sunbeams, soft natural contact shadows, subtle film grain, tactile fine details, gorgeous restrained saturated palette. The RIGHT TWO THIRDS contain the complete enchanting village in a broad high-angle three-quarter composition. A tiny welcoming coral-terracotta tiled, open timber warung with cream and faded sage striped awning, tiled ridge, little stools, warm hanging lamps, a small seating terrace with a shared wood table and laptops, tall bending coconut palms with individual deep-green paper leaflets and coconuts, banana plants, curving sandy footpath, red and cream Balinese parasol, round stones and soft green groundcover, a few tiny cute maker figurines. Teal turquoise sea with cream foam curls at the lower and far RIGHT shore, softly layered blue-green Bali headlands along the horizon, misty light. Entire main roof and tallest palms visibly INSIDE the frame with breathing room. LEFT 36 PERCENT is very pale warm apricot morning sky and softly illuminated airy distant sea haze, a nearly blank softly textured light area across the entire height on the left, suitable for dark typography to be superimposed by a designer. The diorama eases into pale sand at left without a hard boundary, hero scene flows from sparse distant left to rich detailed right. Directional morning light from upper left. Premium playful travel editorial, rich emerald greens and warm tile, delicious detail, like a macro shot of a real tiny world. Sharp detail on courtyard with softened background. Avoid flat vector, avoid pixel art, avoid plastic shine, avoid childish cartoon rainbow, avoid modern skyscrapers, gradients with no scenery, dark vignette, any inscription or typography. Horizontal landscape only.",
+  "portraitTemplate": "Use case: identity-preserve. One square collectible resident portrait for Palm Hours, a Balinese maker village. The single supplied image is the identity reference of the real resident. Reimagine the SAME person as an utterly charming, recognizable high-end miniature handmade polymer-clay figure, photographed on a softly matte single-color studio cyclorama. Slightly oversize rounded head and short chunky body, hand-sculpted distinct hair locks, tiny expressive deep-brown bead eyes, soft rounded nose and ears, miniature fingers. Capture clear likeness through the actual head shape, hairstyle, hair color, glasses, beard or lack of beard, skin tone, expression, and recognizable upper clothing from this particular reference. For monochrome references, use plausible natural color and preserve the visible clothing. Maintain distinctive features without caricaturing them. Warm kind expression, slight lively turn toward the viewer. Show the WHOLE head with air above it and the torso down to the waist, centered, no cropped hair, framing about 75 to 83 percent of the square. Portrait should read at 100 pixels. Key light from upper left, soft ambient fill and soft cast shadows, tactile smooth matte clay, rich elegant colors, stop-motion practical miniature studio quality, no outlines. The resident is proudly holding PROP clearly visible in its entirety at chest height. Background color BACKGROUND. Only one person in image. No typography, signature, framing, border, pedestal, sparkles or unrelated items. No text or logos. No realism in skin, no flat drawing, no cheap plastic sheen.",
+  "portraits": [
+    {
+      "handle": "phuctm97",
+      "reference": "https://x.com/phuctm97",
+      "PROP": "a tiny terracotta hacker house with a little dormer and green front door, for Hacker Residency",
+      "BACKGROUND": "apricot cream"
+    },
+    {
+      "handle": "ky__zo",
+      "reference": "https://x.com/ky__zo",
+      "PROP": "a little mint-green toy helicopter, for CopyCopter",
+      "BACKGROUND": "seafoam green"
+    },
+    {
+      "handle": "Erwin_AI",
+      "reference": "https://x.com/Erwin_AI",
+      "PROP": "a cyan toy magnifying glass, for Tailscan",
+      "BACKGROUND": "pale golden butter"
+    },
+    {
+      "handle": "dannypostma",
+      "reference": "https://x.com/dannypostma",
+      "PROP": "a chunky little black and brass camera on a neck strap, for HeadshotPro",
+      "BACKGROUND": "powder blue"
+    },
+    {
+      "handle": "josefbuettgen",
+      "reference": "https://x.com/josefbuettgen",
+      "PROP": "a tiny clear round bowl with one orange goldfish, for My Aquarium",
+      "BACKGROUND": "peach pink"
+    },
+    {
+      "handle": "melanieklenner",
+      "reference": "https://x.com/melanieklenner",
+      "PROP": "a small wooden polo mallet held upright, for PoloFlow",
+      "BACKGROUND": "pale lavender"
+    },
+    {
+      "handle": "ann_nnng",
+      "reference": "https://x.com/ann_nnng",
+      "PROP": "a miniature bubblegum-pink retro computer with pixel eyes, for Bubbbly",
+      "BACKGROUND": "light dusty rose"
+    },
+    {
+      "handle": "loaibassam",
+      "reference": "https://x.com/loaibassam",
+      "PROP": "a lilac clipboard with a small mint checkmark, for Plutio",
+      "BACKGROUND": "pastel ochre"
+    },
+    {
+      "handle": "sup_nim",
+      "reference": "https://x.com/sup_nim",
+      "PROP": "a small bouquet of red and yellow tropical flowers in kraft paper, for HeyFlower",
+      "BACKGROUND": "pale mint"
+    },
+    {
+      "handle": "founderish",
+      "reference": "https://x.com/founderish",
+      "PROP": "a little cheerful pennant on a wooden pole, for Tutti",
+      "BACKGROUND": "powder blue"
+    },
+    {
+      "handle": "tdinh_me",
+      "reference": "https://x.com/tdinh_me",
+      "PROP": "a tiny teal toolbox with an orange handle, for DevUtils",
+      "BACKGROUND": "peach pink"
+    },
+    {
+      "handle": "rameerez",
+      "reference": "https://x.com/rameerez",
+      "PROP": "a faceted ruby-red gem the size of an apple, for his Ruby projects",
+      "BACKGROUND": "pale butter"
+    },
+    {
+      "handle": "FiachraRM",
+      "reference": "https://x.com/FiachraRM",
+      "PROP": "a small cream tear-off desk calendar with a red flip binding, for Chengyu Calendar",
+      "BACKGROUND": "light duck-egg blue"
+    },
+    {
+      "handle": "praneethpike",
+      "reference": "https://x.com/praneethpike",
+      "PROP": "a tiny white bunny figurine, for RabbitHoles",
+      "BACKGROUND": "pale lilac"
+    },
+    {
+      "handle": "sandrokratz",
+      "reference": "https://x.com/sandrokratz",
+      "PROP": "a vivid orange climbing carabiner, for climbing",
+      "BACKGROUND": "muted light sage"
+    },
+    {
+      "handle": "odd_joel",
+      "reference": "https://x.com/odd_joel",
+      "PROP": "a handheld phone with a tiny green terminal cursor, for Moshi",
+      "BACKGROUND": "light apricot"
+    },
+    {
+      "handle": "ayysoni",
+      "reference": "https://x.com/ayysoni",
+      "PROP": "a tiny green circuit board, for hardware tinkering",
+      "BACKGROUND": "pale blue"
+    },
+    {
+      "handle": "yongfook",
+      "reference": "https://x.com/yongfook",
+      "PROP": "a little honey-brown teddy bear, for Bannerbear",
+      "BACKGROUND": "pale pistachio"
+    }
+  ]
+}

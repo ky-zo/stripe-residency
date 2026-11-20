@@ -1,0 +1,19 @@
+{
+  "name": "palm-hours",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "vite build && node scripts/package-extras.mjs",
+    "preview": "wrangler dev --local --ip 127.0.0.1 --var LOCAL_DEVELOPMENT:true",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "three": "^0.183.0"
+  },
+  "devDependencies": {
+    "vite": "^7.2.2",
+    "wrangler": "4.165.0"
+  }
+}

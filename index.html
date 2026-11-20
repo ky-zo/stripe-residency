@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#faf8f1">
+    <meta name="description" content="Walk through a tiny Balinese maker residency, meet eighteen clay residents, and take a seat by the sea.">
+    <title>Palm Hours · A Bali maker residency</title>
+    <link rel="icon" href="/sun.svg" type="image/svg+xml">
+    <link rel="preload" href="/fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/fonts/instrument-serif-italic.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/art/courtyard.webp" as="image">
+    <link rel="stylesheet" href="/src/style.css">
+  </head>
+  <body>
+    <a class="skip" href="#residents">Skip to residents</a>
+    <header class="mast">
+      <div class="frame mast-inner">
+        <a class="wordmark" href="#island" aria-label="Palm Hours home"><i data-icon="sunmark"></i><span>Palm Hours</span></a>
+        <nav aria-label="Main navigation">
+          <a id="nav-island" class="nav-link active" href="#island">The island</a>
+          <a id="nav-residents" class="nav-link" href="#residents">Residents</a>
+        </nav>
+        <div class="mast-end">
+          <div class="local-time"><i data-icon="sun"></i><span>Bali <span class="time-sep">/</span> <time id="clock">WITA</time></span></div>
+          <button type="button" class="sound round-btn" id="sound" aria-label="Turn on island sounds" title="Turn on island sounds" aria-pressed="false"><i data-icon="mute"></i></button>
+        </div>
+      </div>
+    </header>
+    <main class="frame">
+      <section id="island" class="stage" tabindex="-1" aria-label="Palm Hours island">
+        <div class="postcard" id="postcard">
+          <img class="cover" src="/art/courtyard.webp" alt="A miniature terracotta-roofed warung among coconut palms on the turquoise Balinese coast." fetchpriority="high">
+          <div class="postcard-copy">
+            <p class="eyebrow hero-kicker"><span class="rule"></span>A maker residency</p>
+            <h1>Palm <em>Hours.</em></h1>
+            <p class="intro">Eighteen makers and a seaside warung. Come find your friends under the palms.</p>
+            <button type="button" id="enter" class="primary enter"><i data-icon="walk"></i><span>Enter the courtyard</span></button>
+          </div>
+          <div class="postcard-location"><i data-icon="pin"></i>Bali, Indonesia</div>
+        </div>
+        <div id="play-space" class="play-space" hidden>
+          <div id="world-host" class="world-host" tabindex="0" aria-label="Walkable three-dimensional courtyard. Use the arrow keys or W A S D to walk. Use E to meet a nearby resident or sit down."></div>
+          <div class="world-top">
+            <button class="world-control" id="leave" type="button"><i data-icon="island"></i><span>Island home</span></button>
+            <div class="world-actions">
+              <button class="world-control" type="button" id="camera" aria-label="Switch to a wide view" title="Switch to a wide view"><i data-icon="aperture"></i></button>
+              <button class="world-control" type="button" id="help" aria-label="How to explore" title="How to explore"><i data-icon="help"></i></button>
+            </div>
+          </div>
+          <div id="world-label" class="world-label" hidden></div>
+          <div id="visitor-label" class="visitor-label" hidden>You</div>
+          <div id="world-bottom" class="world-bottom">
+            <p class="move-hint"><i data-icon="pointer"></i><span>Tap to walk <b>·</b> Drag to look</span></p>
+            <button type="button" id="interact" class="world-control context" hidden></button>
+            <button type="button" id="seat" class="primary compact"><i data-icon="coffee"></i>Take a seat</button>
+          </div>
+          <div id="focus-panel" class="focus-panel" aria-label="Focus session" hidden>
+            <div><span class="eyebrow" id="focus-caption">At the worktable</span><strong id="focus-time" role="timer">25:00</strong></div>
+            <div class="focus-actions"><button id="focus-toggle" class="outline-btn" type="button">Pause</button><button id="stand" class="text-btn" type="button">Stand up</button></div>
+          </div>
+          <div class="world-status" id="world-status" role="status" hidden></div>
+        </div>
+      </section>
+      <section class="roster" id="residents" aria-labelledby="roster-title">
+        <div class="section-heading">
+          <div class="section-titles"><i class="roster-flower" data-icon="flower"></i><h2 id="roster-title">The residents</h2></div>
+          <button class="roster-toggle" type="button" id="all" aria-controls="resident-list" aria-expanded="false"><i data-icon="grid"></i><span>View all 18</span></button>
+        </div>
+        <div id="resident-list" class="resident-list" aria-label="Resident portraits"></div>
+      </section>
+    </main>
+    <dialog id="profile-dialog" class="profile-dialog" aria-labelledby="resident-name">
+      <button id="close-profile" class="round-btn modal-close" aria-label="Close resident profile" type="button"><i data-icon="close"></i></button>
+      <div class="profile-layout">
+        <div class="profile-art" id="profile-art">
+          <img id="profile-image" alt="">
+          <div id="model-host" class="model-host" tabindex="0" role="img" aria-label="Rotatable 3D figure. Drag or use the left and right arrow keys." hidden></div>
+          <div id="model-fallback" class="model-fallback" role="status" hidden></div>
+          <div class="art-tabs" role="group" aria-label="Character view"><button type="button" id="view-portrait" aria-pressed="true">Portrait</button><button type="button" id="view-model" aria-pressed="false"><i data-icon="cube"></i>3D figure</button></div>
+        </div>
+        <div class="profile-copy">
+          <p class="eyebrow" id="resident-role"></p>
+          <h2 id="resident-name"></h2>
+          <a id="resident-handle" class="profile-handle" target="_blank" rel="noopener noreferrer"></a>
+          <p id="resident-bio" class="bio"></p>
+          <div class="keepsake"><i data-icon="sparkle"></i><div><small>Island keepsake</small><strong id="resident-prop"></strong></div></div>
+          <div class="profile-actions"><button type="button" class="primary compact" id="claim-profile"><i data-icon="walk"></i>Play as resident</button><button type="button" class="outline-btn" id="find-resident"><i data-icon="pin"></i>Find in courtyard</button><a id="resident-source" class="source" target="_blank" rel="noopener noreferrer">Field note</a></div>
+          <p id="claim-status" class="download-status" role="status" hidden></p>
+          <button type="button" class="download text-btn" id="download-model" hidden><i data-icon="download"></i>Download figure (.glb)</button>
+          <p class="download-status" id="download-status" role="status" hidden></p>
+        </div>
+      </div>
+    </dialog>
+    <dialog id="help-dialog" class="help-dialog" aria-labelledby="help-title">
+      <button class="round-btn modal-close" aria-label="Close controls" id="close-help" type="button"><i data-icon="close"></i></button>
+      <h2 id="help-title">Around the island</h2>
+      <p>Tap a patch of ground to walk there, or use <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or the arrow keys. Drag the scene to look around.</p>
+      <p>Tap a resident to meet them, or press <kbd>E</kbd> nearby. Choose a character to play as them. Friends on your invite link share this island.</p>
+      <p>Press <kbd>Space</kbd> to wave, kick the striped ball, or take a seat together for a 25-minute focus session.</p>
+    </dialog>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

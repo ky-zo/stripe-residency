@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.studio/
+.DS_Store
+*.local
+*.log
+.openai/hosting-archive*
+.wrangler/
+.dev.vars*
+.env*
+build/
