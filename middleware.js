@@ -2,13 +2,16 @@ import {next, rewrite} from '@vercel/edge';
 import {issueRoomPass} from './shared/invitations.js';
 
 const roomHost = 'palm-hours-island.qstar0.workers.dev';
+// Search engines stay out. Link-preview crawlers may fetch the page and its share image and video.
+const previewBots = ['Twitterbot','facebookexternalhit','Facebot','LinkedInBot','Slackbot-LinkExpanding','Discordbot','TelegramBot','WhatsApp'];
+const robots = previewBots.map(bot=>'User-agent: '+bot+'\n').join('') + 'Allow: /\n\nUser-agent: *\nDisallow: /\n';
 const privateHeaders = {'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Robots-Tag':'noindex, nofollow'};
 
 export const config = {matcher:'/:path*'};
 
 export default async function middleware(request) {
   const url = new URL(request.url);
-  if (url.pathname === '/robots.txt') return new Response('User-agent: *\nDisallow: /\n');
+  if (url.pathname === '/robots.txt') return new Response(robots);
   if (request.method !== 'GET' && request.method !== 'HEAD') return new Response(null,{status:405});
   // The island is public. Old invitation links land on the front page.
   if (url.pathname === '/join' || url.pathname.startsWith('/join/')) return Response.redirect(new URL('/',url), 308);

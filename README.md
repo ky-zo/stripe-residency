@@ -24,6 +24,8 @@ Disconnecting releases the player's character and seat. An open tab can reintrod
 
 `npm run build` creates the Vercel website and a ZIP of all 21 GLB figures in `build/island`. The production project is `kyzobuilds/palm-hours`. Vercel serves the public site at [stripe.house](https://stripe.house). Its middleware gives each browser a one-minute, origin-bound pass to open a WebSocket directly to the Cloudflare room. Old `/join/…` invitation links redirect to the front page. This also works in browsers that block third-party cookies.
 
+Shared links show `public/og/share.jpg` (1200×630) and, where the app plays Open Graph video, `public/og/share.mp4`. The video is a 10-second, 720p loop recorded from the island itself. `robots.txt` admits link-preview crawlers such as Twitterbot, Slackbot and Discordbot and keeps search engines out.
+
 Production uses the same `ISLAND_INVITE` and `ROOM_SIGNING_KEY` secrets on Vercel and Cloudflare. Vercel uses `ISLAND_INVITE` only to read the member directory from the room. `wrangler.jsonc` configures the room. The private Sites entry opens the shared invitation through `COURTYARD_INVITATION_URL`.
 
 `src/residents.js` contains the profile sources and keepsakes. The GPT ImageGen clay portraits live in `public/portraits`. Their original and revised prompts are in `art-direction.json`. Each playable resident has sculpted hair, bead eyes, a pressed-clay smile and a personal keepsake. The gallery, GLB download and island share the same figure. On the island, the eyes change expression when a resident waves or rests on a sunbed. The Stripe wordmark comes from the [Stripe newsroom](https://stripe.com/newsroom/information).
