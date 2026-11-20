@@ -1,6 +1,7 @@
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { onMat, SEATS, WATER_Y, WORK_DESKS, WORK_MATS } from './island-life.js';
-import { BEACH_PROFILE, PALMS, palmTrunk, shoreline } from '../shared/mobility.js';
+import { BEACH_PROFILE, PALMS, beachRadius, palmTrunk, shoreline } from '../shared/mobility.js';
+import { PADEL } from '../shared/sports.js';
 import { addShoreActivities } from './shore-art.js';
 
 const TAU = Math.PI * 2;
@@ -158,6 +159,75 @@ function makeContactShadows(T) {
     parent.add(mesh);
   }
   return { ellipse, finish };
+}
+
+// Turf lies over the sand as one soft-edged layer. Each patch fades out at its rim,
+// so overlapping patches read as one lawn and the outer edge melts into the beach.
+function makeLawns(T, random) {
+  const positions = [], normals = [], colours = [], indices = [];
+  const greens = ['#8dab60', '#9fb86b', '#7f9f59'].map(c => new T.Color(c));
+  const rim = new T.Color('#c2c286');
+  const tint = new T.Color();
+  const rings = [[.22, 1], [.46, 1], [.66, 1], [.80, .92], [.90, .5], [1, 0]];
+  const patches = [];
+  function vertex(x, z, f, alpha) {
+    const a = .5 + .5 * Math.sin(x * .83 + 1.7 * Math.sin(z * .41));
+    const b = .5 + .5 * Math.sin(z * 1.13 - x * .37 + .6);
+    tint.copy(greens[0]).lerp(greens[1], a * .8).lerp(greens[2], b * .45).lerp(rim, Math.max(0, (f - .6) / .4));
+    positions.push(x, .006, z);
+    normals.push(0, 1, 0);
+    colours.push(tint.r, tint.g, tint.b, alpha);
+  }
+  // Each patch is a wobbly ellipse that stops short of the wet sand.
+  function patch(cx, cz, rx, rz, { angle = 0, limit = .8, sides = 72 } = {}) {
+    const p1 = random() * TAU, p2 = random() * TAU, p3 = random() * TAU;
+    const reach = [];
+    for (let i = 0; i < sides; i++) {
+      const a = TAU * i / sides, c = Math.cos(a), s = Math.sin(a);
+      const u = c * Math.cos(angle) + s * Math.sin(angle), v = s * Math.cos(angle) - c * Math.sin(angle);
+      const wobble = 1 + .09 * Math.sin(3 * a + p1) + .06 * Math.sin(5 * a + p2) + .035 * Math.sin(11 * a + p3);
+      const outer = wobble / Math.hypot(u / rx, v / rz);
+      let r = .2;
+      while (r < outer && beachRadius(cx + c * r, cz + s * r) < limit) r += .05;
+      reach.push(r);
+    }
+    const offset = positions.length / 3;
+    vertex(cx, cz, 0, 1);
+    for (const [f, alpha] of rings) {
+      for (let i = 0; i < sides; i++) {
+        const a = TAU * i / sides;
+        vertex(cx + Math.cos(a) * reach[i] * f, cz + Math.sin(a) * reach[i] * f, f, alpha);
+      }
+    }
+    const at = (ring, i) => offset + 1 + ring * sides + (i % sides);
+    for (let i = 0; i < sides; i++) indices.push(offset, at(0, i + 1), at(0, i));
+    for (let ring = 0; ring < rings.length - 1; ring++) {
+      for (let i = 0; i < sides; i++) {
+        indices.push(at(ring, i), at(ring, i + 1), at(ring + 1, i + 1));
+        indices.push(at(ring, i), at(ring + 1, i + 1), at(ring + 1, i));
+      }
+    }
+    const shape = { cx, cz, rx, rz, sides, reach };
+    patches.push(shape);
+    return shape;
+  }
+  function finish(parent) {
+    const geometry = new T.BufferGeometry();
+    geometry.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('normal', new T.Float32BufferAttribute(normals, 3));
+    geometry.setAttribute('color', new T.Float32BufferAttribute(colours, 4));
+    geometry.setIndex(indices);
+    geometry.computeBoundingSphere();
+    const material = new T.MeshStandardMaterial({ vertexColors: true, transparent: true, depthWrite: false, roughness: 1 });
+    const mesh = new T.Mesh(geometry, material);
+    mesh.name = 'Lawns';
+    mesh.receiveShadow = true;
+    // Draw before the court glass, water and contact shadows so they all layer on top.
+    mesh.renderOrder = -1;
+    parent.add(mesh);
+    return mesh;
+  }
+  return { patch, patches, finish };
 }
 
 function makeWater(T, root) {
@@ -1011,6 +1081,119 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
   oceanHills.scale.setScalar(4);
   oceanHills.position.y=WATER_Y*(1-oceanHills.scale.y);
   oceanHills.receiveShadow=false;
+
+  // Everything below draws from the shared random stream after the existing art,
+  // so adding it leaves every earlier plant and pebble where it was.
+  const lawns = makeLawns(T, random);
+  // The padel spit is lawn almost to the waterline. Smaller lawns sit behind the warung and the tables.
+  lawns.patch(16.4,.6,7.6,7.2,{limit:.88});
+  lawns.patch(9.0,-4.1,2.8,1.9,{angle:-.2,limit:.86});
+  lawns.patch(-7.6,-1.2,3.4,3.0,{angle:.25,limit:.86});
+  lawns.patch(-1.4,-5.2,3.0,1.5,{angle:.1,limit:.85});
+  lawns.patch(1.6,-4.85,2.4,1.25,{angle:-.15,limit:.85});
+
+  function bush(x, z, size, bloom = null) {
+    const greens = ['#4f7c4f','#5d8954','#6b9358','#7a9d5d'];
+    const lumps = [];
+    for (let k = 0; k < 7; k++) {
+      const a = k * 2.4 + range(-.3,.3), r = k ? size * range(.26,.40) : 0;
+      const radius = size * (k ? range(.26,.36) : .42);
+      const lx = x + Math.cos(a)*r, lz = z + Math.sin(a)*r, ly = k ? radius*range(.85,1.15) : size*.46;
+      lumps.push([lx,ly,lz,radius]);
+      ball(details, k ? pick(greens) : greens[1], lx, ly, lz, radius, radius*.86, radius, 0, a, 0);
+    }
+    if (bloom) {
+      const light = '#' + new T.Color(bloom).lerp(new T.Color('#fff4dc'),.35).getHexString();
+      for (let k = 0; k < 12; k++) {
+        const [lx,ly,lz,r] = lumps[1 + k % 6], a = range(0,TAU), up = range(.2,.9), out = Math.sqrt(1-up*up);
+        const dot = size * range(.085,.115);
+        details.stamp(props.oval, k%3 ? bloom : light, lx+Math.cos(a)*out*r, ly+up*r*.86, lz+Math.sin(a)*out*r, dot, dot*.62, dot, 0, a, 0);
+      }
+    }
+    obstacle(x,z,size*1.2,size*1.2);
+    shadows.ellipse(x,z,size*.95,size*.8,.22);
+  }
+
+  // Frangipani: a pale forked trunk with leaf rosettes and cream flowers at each tip.
+  function frangipani(x, z, size) {
+    const fork = [x + .05*size, .85*size, z];
+    rod(details,'#9d8a72',[x,0,z],fork,.075*size);
+    disc(details,'#8d7a63',x,.04,z,.11*size,.08);
+    for (let k = 0; k < 4; k++) {
+      const a = k*TAU/4 + range(-.4,.4) + .3;
+      const mid = [fork[0]+Math.cos(a)*.32*size, fork[1]+.38*size, fork[2]+Math.sin(a)*.32*size];
+      const tip = [fork[0]+Math.cos(a)*.62*size, fork[1]+range(.62,.85)*size, fork[2]+Math.sin(a)*.62*size];
+      rod(details,'#9d8a72',fork,mid,.05*size);
+      rod(details,'#b09b7f',mid,tip,.036*size);
+      for (let j = 0; j < 7; j++) {
+        blade(details,tip,j*TAU/7+range(-.2,.2),size*range(.34,.46),size*.09,size*.10,size*.17,'#567f4d','#6f9556');
+      }
+      for (let j = 0; j < 3; j++) {
+        flower(details,tip[0]+range(-.09,.09)*size,tip[1]+.07*size,tip[2]+range(-.09,.09)*size,.10*size,j%2 ? '#fff3d8' : '#fbe4bd');
+      }
+    }
+    obstacle(x,z,.36*size,.36*size);
+    shadows.ellipse(x+.1,z,.95*size,.8*size,.20);
+  }
+
+  // A slatted bench along z, facing east toward the court.
+  function bench(x, z) {
+    for (const dz of [-.55,.55]) block(details,'#77472f',x,.20,z+dz,.36,.40,.09);
+    block(details,'#9c6440',x,.40,z,.44,.05,1.40);
+    for (const dx of [-.13,0,.13]) board(details,'#b97c4c',x+dx,.44,z,.11,.035,1.38);
+    for (const dz of [-.55,.55]) block(details,'#77472f',x-.2,.62,z+dz,.06,.48,.08,0,0,.14);
+    block(details,'#b97c4c',x-.23,.74,z,.05,.17,1.38,0,0,.14);
+    obstacle(x,z,.5,1.46);
+    shadows.ellipse(x,z,.42,.80,.22);
+  }
+
+  // The padel lawn: stepping stones to the west gate, a bench, shade trees and hedging.
+  for (let i = 0; i < 6; i++) {
+    const t = i/5;
+    paving(lerp(10.55,13.75,t),1.04+.16*Math.sin(t*Math.PI*1.4),range(.30,.38),range(.21,.27),pick(['#e3cfa6','#d9c39a','#e9d5ae']),range(-.4,.4));
+  }
+  bench(13.15,-1.75);
+  frangipani(12.75,3.45,1.1);
+  frangipani(20.5,.75,.85);
+  for (const [x,z,size,bloom] of [
+    [15.0,-3.85,.75,null],[16.25,-3.62,.6,'#d98a9a'],[13.85,-4.75,.68,null],
+    [13.3,4.65,.72,'#d98a9a'],[12.15,5.15,.55,null],
+    [20.15,-1.2,.5,null],[20.0,2.6,.58,'#e89c7c'],
+    [10.9,4.95,.62,'#e89c7c'],[11.65,5.4,.45,null],[15.55,5.25,.42,'#d98a9a'],
+  ]) bush(x,z,size,bloom);
+  tropicalPlant(18.55,.015,-3.35,.55);
+  tropicalPlant(14.25,.015,5.3,.5,true);
+  tropicalPlant(17.9,.015,4.95,.45);
+
+  // Grass tufts gather toward each lawn's rim and break up its outline.
+  const tuftTones = [['#6f8f51','#93ae66'],['#7c9a57','#a7bb72'],['#6a8a52','#8aa75e']];
+  const keepClear = [
+    { x:PADEL.x, z:PADEL.z, w:4.9, d:7.5 },
+    { x:12.15, z:1.04, w:3.9, d:.85 },
+    WARUNG_FOOTPRINT,
+    ...WORK_DESKS.map(({x,z}) => ({ x, z, w:3.0, d:2.0 })),
+  ];
+  const clearAt = (x, z) => beachRadius(x,z) < .86 &&
+    !keepClear.some(o => Math.abs(x-o.x) < o.w/2 && Math.abs(z-o.z) < o.d/2) &&
+    !obstacles.some(o => Math.abs(x-o.x) < o.w/2+.12 && Math.abs(z-o.z) < o.d/2+.12);
+  function tuft(x, z, size) {
+    const [base, tip] = pick(tuftTones);
+    for (let k = 0, blades = 4 + Math.floor(random()*3); k < blades; k++) {
+      const a = range(0,TAU), h = size*range(.7,1.15), lean = range(.15,.45)*h, w = size*.07;
+      const bx = x + Math.cos(a)*size*.18, bz = z + Math.sin(a)*size*.18;
+      const sx = -Math.sin(a)*w, sz = Math.cos(a)*w;
+      landscape.face([bx-sx,.004,bz-sz],[bx+sx,.004,bz+sz],[bx+Math.cos(a)*lean,h,bz+Math.sin(a)*lean],[base,base,tip]);
+    }
+  }
+  for (const { cx, cz, rx, rz, sides, reach } of lawns.patches) {
+    for (let n = Math.round(rx*rz*8); n > 0; n--) {
+      const i = Math.floor(random()*sides), f = random() < .6 ? range(.62,1.02) : Math.sqrt(random())*.62;
+      const a = TAU*i/sides + range(-.04,.04);
+      const x = cx + Math.cos(a)*reach[i]*f, z = cz + Math.sin(a)*reach[i]*f;
+      if (clearAt(x,z)) tuft(x,z,range(.12,.22)*(f > .9 ? .8 : 1));
+    }
+  }
+  lawns.finish(root);
 
   landscape.finish(grain,root,false);
   details.finish(clay,root);
