@@ -199,7 +199,7 @@ export function playPose(id, serverTimeMs, playerId='guest',position=null) {
   }
   if(id!=='swim')return null;
   const p=position||waterEntry(playerId);
-  return {x:p.x,z:p.z,y:WATER_Y+.024*Math.sin(serverTimeMs*.0029),yaw:p.yaw,walking:Boolean(p.walking),activity:'swim',land:PLAY_SPOTS[1].land};
+  return {x:p.x,z:p.z,y:WATER_Y+.024*Math.sin(serverTimeMs*.0029),yaw:p.yaw,walking:Boolean(p.walking),activity:'swim',land:position?null:PLAY_SPOTS[1].land};
 }
 
 /** An eight-panel vinyl beach ball. Its object origin is the centre of the ball. */

@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { matchingResident, residents } from '../src/residents.js';
 import { SEATS, PLAY_SPOTS, npcLandPose } from '../src/island-life.js';
-import {beachRadius,climbPose,climbSpots,inLagoon,JUMP_MS,jumpLift,shoreActivity,SCOOTER_START,scooterSpot,waterAtCoast,waterEntry} from '../shared/mobility.js';
+import {beachRadius,climbPose,climbSpots,inLagoon,JUMP_MS,jumpLift,movementCredit,shoreActivity,SCOOTER_START,scooterSpot,waterAtCoast,waterEntry} from '../shared/mobility.js';
 import { activityId, activitySeat, climbKey } from '../shared/activities.js';
 import { ballAt, colors, initialBall } from '../shared/ball.js';
 import { acceptsRoomPass, hasInvitation, invitationCookie, invitationPage } from '../shared/invitations.js';
@@ -211,23 +211,26 @@ export class Courtyard extends DurableObject {
       if(!finite(msg.x,msg.z,msg.yaw))return;
       const id=activityId(p.seat),elapsed=(now-p.lastMove)/1000;
       if(p.seat!==null&&!['swim','ride','climb','boulder','surf','boat','padel'].includes(id)||p.seat==='play:boat:bow')return;
-      let pose={x:msg.x,z:msg.z,yaw:msg.yaw},progress=0,nextActivity=id;
+      let pose={x:msg.x,z:msg.z,yaw:msg.yaw},progress=0,nextActivity=id,credit;
+      const balance=session.motionSeat===p.seat?session.motionCredit:null;
       if(id==='climb'||id==='boulder'){
         const spot=this.playSpot(id,climbKey(p.seat));
-        if(!spot||!Number.isFinite(msg.progress)||msg.progress<0||msg.progress>1||Math.abs(msg.progress-(p.progress||0))>elapsed*.8+.09){
+        credit=movementCredit(balance,elapsed,.8,Math.abs(msg.progress-(p.progress||0)));
+        if(!spot||!Number.isFinite(msg.progress)||msg.progress<0||msg.progress>1||credit===null){
           send(ws,{type:'correct',player:publicPlayer(p)});return;
         }
         progress=msg.progress;pose=id==='boulder'?boulderPose(progress):climbPose(spot,progress);
       }else{
         const speed={ride:8.8,swim:4.8,boat:10,surf:now-(p.strokeAt||0)<SURF_BOOST_MS+350?8.8:6.4,padel:5}[id]||6.1;
-        if(!inLagoon(msg.x,msg.z)||dist(msg,p)>Math.min(23,elapsed*speed+1.1)){send(ws,{type:'correct',player:publicPlayer(p)});return;}
+        credit=movementCredit(balance,elapsed,speed,dist(msg,p));
+        if(!inLagoon(msg.x,msg.z)||credit===null){send(ws,{type:'correct',player:publicPlayer(p)});return;}
         if(id==='padel'&&!onCourt(msg.x,msg.z,courtSide(p.seat))||id==='boat'&&!floatable(msg.x,msg.z)){
           send(ws,{type:'correct',player:publicPlayer(p)});return;
         }
         if(id==='surf')nextActivity=floatable(msg.x,msg.z)?'surf':null;
         else if(id!=='padel'&&id!=='boat')nextActivity=shoreActivity(id,msg.x,msg.z,jumpLift(p.jumpAt,now));
       }
-      if(elapsed<.045&&nextActivity===id)return;
+      session.motionCredit=credit;session.motionSeat=p.seat;
       Object.assign(p,{x:signed(pose.x),z:signed(pose.z),yaw:signed(Math.atan2(Math.sin(pose.yaw),Math.cos(pose.yaw))),progress,walking:msg.walking===true,lastMove:now});
       if(nextActivity!==id){
         p.seat=nextActivity==='swim'?activitySeat('swim',p.id):null;p.jumpAt=0;

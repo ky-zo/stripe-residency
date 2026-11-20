@@ -361,7 +361,7 @@ export function createWorld(host,residents,callbacks) {
     const target=byHandle.get(handle);
     if(own?.handle===handle||own?.memberId&&memberHandle(own.memberId)===handle)return;
     if(!target){callbacks.notice('This member is away from the island.');return;}
-    if(seated||doing){afterStand=()=>find(handle);stand();return;}
+    if(seated||doing&&doing!=='swim'){afterStand=()=>find(handle);stand();return;}
     const destination=approachFor(target,avatar.position);
     if(!destination)return;
     introView=false;wide=false;callbacks.onCamera(false);spotlit=target;spotlightUntil=elapsed+16;
@@ -752,9 +752,14 @@ export function createWorld(host,residents,callbacks) {
     if(travelView){({angle,tilt,wide}=travelView);travelView=null;}
   }
   function setBlocked(value){blocked=value;if(value){keys.clear();stick.right=stick.forward=0;pointerStart=null;hovered=null;}else if(running)last=performance.now();}
+  function correct(p){
+    const destination=route.at(-1),onArrival=arrival,tracked=following,showMarker=marker.visible;
+    cancelWalk();shorePending=false;drive.reset();progress=p.progress||0;snap(p);
+    if(destination&&doing===activityId(p.seat)&&go(destination,onArrival,showMarker))following=tracked;
+  }
   function toggleCamera(){introView=false;wide=!wide;callbacks.onCamera(wide);return wide;}
   return {start,stop,find,takeSeat,takeActivity,stand,kick,jump,
     setStick(right,forward){stick.right=right;stick.forward=forward;},
     interact:()=>interact(),toggleCamera,setBlocked,applyRoom,wave,
-    setBall(b){ballState=b;},correct(p){cancelWalk();shorePending=false;drive.reset();progress=p.progress||0;snap(p);},clearRequest(){pendingSeat=null;shorePending=false;}};
+    setBall(b){ballState=b;},correct,clearRequest(){pendingSeat=null;shorePending=false;}};
 }

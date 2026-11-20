@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {BOAT_START,BOULDER,PADEL,SURF,boulderPose,canReturnPadel,courtEntry,floatable,newPadelShot,onCourt,padelBallAt,stepOffBoat,surfEntry} from '../shared/sports.js';
-import {OCEAN_RADIUS,canSwim,groundHeight,nearbyBeach,shoreActivity} from '../shared/mobility.js';
+import {OCEAN_RADIUS,canSwim,groundHeight,movementCredit,nearbyBeach,shoreActivity} from '../shared/mobility.js';
+import {playPose} from '../src/island-life.js';
 import {createNavigation} from '../src/navigation.js';
 
 test('offshore travel surrounds the expanded beach and boats can route around the island',()=>{
@@ -50,4 +51,16 @@ test('a padel serve clears the net, bounces, and can be returned only on the rec
   assert.ok(!canReturnPadel(shot,'north',receiver.x+4,receiver.z,contact));
   const practice=newPadelShot(serve.x,serve.z,'south',start,1,{toWall:true});
   assert.equal(practice.toZ,PADEL.z-3.48);
+});
+
+test('delayed movement can arrive in a burst while still respecting the travel limit',()=>{
+  const speed=6.1;
+  let balance=movementCredit(null,.1,speed,.37);
+  for(let group=0;group<12;group++)for(let i=0;i<8;i++){
+    balance=movementCredit(balance,i===0?.8:0,speed,.385);
+    assert.notEqual(balance,null);
+  }
+  assert.equal(movementCredit(balance,5,speed,20),null);
+  const swimmer=playPose('swim',1700000000000,'visitor',{x:65,z:15,walking:true,yaw:1});
+  assert.equal(swimmer.land,null);assert.equal(swimmer.x,65);assert.equal(swimmer.z,15);
 });

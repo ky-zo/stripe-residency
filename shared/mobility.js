@@ -95,3 +95,9 @@ export function jumpLift(at,now) {
   const t=(now-at)/JUMP_MS;
   return at>0&&t>=0&&t<1?4.4*t*(1-t):0;
 }
+
+// A short bank of unused travel time absorbs packets that arrive together over the network.
+export function movementCredit(previous,elapsed,rate,travel){
+  const available=Math.min(rate*1.6,(previous??rate*.85)+Math.max(0,elapsed)*rate);
+  return travel<=available+.012?Math.max(0,available-travel):null;
+}
