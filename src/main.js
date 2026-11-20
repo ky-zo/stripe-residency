@@ -281,7 +281,11 @@ function notice(message,delay=2300){
   const element=$('world-status');clearTimeout(noticeTimer);element.textContent=message;element.hidden=false;
   noticeTimer=setTimeout(()=>{element.hidden=true;},delay);
 }
+const promptVerbs={swim:'take a dip',lounge:'lounge on the sunbed',ride:'hop on the scooter',climb:'climb the palm',surf:'go surfing',boat:'board the canoe',padel:'play padel',boulder:'go bouldering'};
 function nearby(item) {
+  const verb=!item?'':item.type==='resident'?'meet '+item.resident.shortName:item.type==='seat'?'take a seat':item.type==='ball'?'kick the ball':promptVerbs[item.id];
+  const prompt=$('world-prompt');prompt.hidden=!verb;
+  if(verb)prompt.querySelector('span').textContent='to '+verb;
   const b=$('interact');
   b.hidden=item?.type!=='resident'&&item?.type!=='activity';
   if(b.hidden)return;
@@ -343,7 +347,11 @@ async function enterWorld(findHandle=null){
   if(!inWorld){
     originalScroll=window.scrollY;hudFolded=false;document.body.classList.add('playing');
     if(navigator.userActivation?.isActive&&document.fullscreenEnabled&&!document.fullscreenElement){
-      document.documentElement.requestFullscreen({navigationUI:'hide'}).then(()=>{if(inWorld)gameFullscreen=true;else if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}).catch(()=>{});
+      document.documentElement.requestFullscreen({navigationUI:'hide'}).then(()=>{
+        if(!inWorld){if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});return;}
+        // Chromium spends Escape on leaving full screen. The lock lets it reach an open dialog first.
+        gameFullscreen=true;navigator.keyboard?.lock?.(['Escape']).catch(()=>{});
+      }).catch(()=>{});
     }
   }
   inWorld=true;worldReady=false;pendingFind=findHandle;postcard.hidden=true;play.hidden=false;activeNav('island');
@@ -381,12 +389,18 @@ function hasWebGL(){
 function leaveWorld(){
   ++entryRevision;inWorld=false;worldReady=false;pendingFind=null;world?.stop();room.close();endFocus();requestedClaim=null;
   activity=null;activitySeat=null;updateSportStatus();sitting=false;clearStick();postcard.hidden=false;play.hidden=true;clearTimeout(noticeTimer);
-  document.body.classList.remove('playing');
+  document.body.classList.remove('playing');nearby(null);
+  if(gameFullscreen)navigator.keyboard?.unlock?.();
   if(gameFullscreen&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});
   gameFullscreen=false;
   expandRoster(list.classList.contains('expanded'));window.scrollTo({top:originalScroll,behavior:'instant'});
   $('enter').focus({preventScroll:true});
 }
+// With Escape locked, an open dialog closes itself. Otherwise Escape still leaves full screen.
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape'||e.defaultPrevented||!gameFullscreen||!document.fullscreenElement||document.querySelector('dialog[open]'))return;
+  document.exitFullscreen().catch(()=>{});
+});
 $('enter').addEventListener('click',()=>enterWorld());
 $('leave').addEventListener('click',leaveWorld);
 $('camera').addEventListener('click',()=>{world?.toggleCamera();host.focus({preventScroll:true});});

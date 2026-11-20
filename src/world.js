@@ -5,13 +5,13 @@ import { createDrive } from './drive.js';
 import {createIslandDogs} from './island-dogs.js';
 import {createDogRun} from './dog-runs.js';
 import { createScooter, SCOOTER_RIG } from './scooter.js';
-import { groundHeight, inLagoon, nearbyBeach, palmTrunk, climbSpots, climbPose, jumpLift, JUMP_MS, shoreActivity, SCOOTER_START, scooterSpot, SWIM_LEVEL, waterEntry } from '../shared/mobility.js';
+import { groundHeight, inLagoon, nearbyBeach, palmTrunk, climbSpots, climbPose, climbYaw, CLIMBERS_PER_PALM, jumpLift, JUMP_MS, shoreActivity, SCOOTER_START, scooterSpot, SWIM_LEVEL, waterEntry } from '../shared/mobility.js';
 import { createNavigation } from './navigation.js';
 
 import { HOME, PLAY_SPOTS, SWIMMER_INDEX, npcPose, playPose, createBeachBall } from './island-life.js';
 import { ballAt, initialBall } from '../shared/ball.js';
 import {appearanceKey,memberHandle} from '../shared/members.js';
-import {activityId,activitySeat,climbKey} from '../shared/activities.js';
+import {activityId,activitySeat,climbKey,climbSlot} from '../shared/activities.js';
 import {BOAT_START,BOULDER,PADEL,SURF,SURF_BOOST_MS,boatSpot,boulderPose,courtSide,floatable,onCourt,seaPose,sideSign} from '../shared/sports.js';
 import {addIslandSports,sportObstacles} from './island-sports.js';
 
@@ -79,7 +79,7 @@ export function createWorld(host,residents,callbacks) {
   loadBike();
   const drive=createDrive();
   const waterPlane=new T.Plane(new T.Vector3(0,1,0),-SWIM_LEVEL);
-  let scooterHit,boatHit,climbing=null,progress=0,climbTarget=null,climbRate=0,localJump=0;
+  let scooterHit,boatHit,climbing=null,climbSide=0,progress=0,climbTarget=null,climbRate=0,localJump=0;
   const stick={right:0,forward:0};
   for(const spot of spots){
     const area=spot.id==='climb'?new T.CylinderGeometry(.42,.54,spot.palm.height*.95,9):
@@ -200,11 +200,13 @@ export function createWorld(host,residents,callbacks) {
   function scanNearby() {
     const p=avatar.position;
     let closest=null,dist=1.68;
-    const nearbyItems=doing==='swim'?[canoeSpot,spots.find(s=>s.id==='surf')]:[...byHandle.values(),...spots,...seats,ballTarget];
+    // Places come before people. Someone on a palm shares its footing, so a free palm wins the tie.
+    const nearbyItems=doing==='swim'?[canoeSpot,spots.find(s=>s.id==='surf')]:[...spots,...seats,ballTarget,...byHandle.values()];
     if(!seated&&(!doing||doing==='swim'))for(const point of nearbyItems){
-      if(point.visible===false || (point.type==='seat'&&seatOwner(point)))continue;
+      if(point.visible===false)continue;
       const d=distance(p,point.land||point);
-      if(d<dist){dist=d;closest=point;}
+      if(d>=dist || point.type==='seat'&&seatOwner(point) || point.type==='activity'&&!spotOpen(point))continue;
+      dist=d;closest=point;
     }
     if(!seated&&!doing&&spotlit?.visible!==false&&spotlit&&elapsed<spotlightUntil&&distance(spotlit.land||spotlit,p)<1.68)closest=spotlit;
     if(closest!==nearest){nearest=closest;callbacks.onNearby(nearest);}
@@ -312,6 +314,11 @@ export function createWorld(host,residents,callbacks) {
     return true;
   }
   function seatOwner(seat){return ensemble.players.find(p=>p.seat!==null&&String(p.seat)===String(seat.id));}
+  function spotOpen({id,key}){
+    if(id==='climb')return ensemble.players.filter(p=>climbKey(p.seat)===key).length<CLIMBERS_PER_PALM;
+    if(id==='boat'||id==='padel')return ensemble.players.filter(p=>activityId(p.seat)===id).length<2;
+    return !ensemble.players.some(p=>p.seat===activitySeat(id,own?.id,key));
+  }
   function takeSeat(seat,immediate=false) {
     if(doing){afterStand=()=>takeSeat(seat,immediate);stand();return;}
     if(seated||pendingSeat||shorePending)return;
@@ -336,11 +343,8 @@ export function createWorld(host,residents,callbacks) {
     if(seated||doing&&!waterBoarding){afterStand=()=>takeActivity(id,key);stand();return;}
     if(ensemble.status!=='online'){callbacks.notice('Waiting for the shared island');return;}
     const candidates=spots.filter(s=>s.id===id&&(!key||s.key===key)).sort((a,b)=>distance(a.land,avatar.position)-distance(b.land,avatar.position));
-    const sharedPair=id==='boat'||id==='padel';
-    const spot=candidates.find(s=>sharedPair
-      ?ensemble.players.filter(p=>activityId(p.seat)===id).length<2
-      :!ensemble.players.some(p=>p.seat===activitySeat(id,own?.id,s.key)));
-    if(!spot){callbacks.notice(id==='climb'?'This palm is occupied. Choose another tree.':id==='ride'?'Someone is riding the motorbike.':'The sunbed is occupied.');return;}
+    const spot=candidates.find(spotOpen);
+    if(!spot){callbacks.notice({climb:'This palm is full. Choose another tree.',ride:'Someone is riding the motorbike.',boat:'Both canoe seats are taken.',padel:'Two players are already on court.',boulder:'Someone is on the boulder.'}[id]||'The sunbed is occupied.');return;}
     const request=()=>{
       if(id==='swim'){go(waterEntry(own.id));return;}
       if(id==='boat'&&distance(avatar.position,spot.land)>2.7){callbacks.notice('The canoe moved. Board it when it comes alongside.');return;}
@@ -443,7 +447,7 @@ export function createWorld(host,residents,callbacks) {
       pendingSeat=null;shorePending=false;drive.reset();snap(next);
       const seat=seats.find(s=>String(s.id)===String(next.seat))||null;
       const oldSeat=seated,oldActivity=doing;seated=seat;doing=activityId(next.seat);ring.visible=!seat&&!doing;
-      climbing=doing==='boulder'?BOULDER:doing==='climb'?climbSpots.find(s=>s.key===climbKey(next.seat)):null;
+      climbing=doing==='boulder'?BOULDER:doing==='climb'?climbSpots.find(s=>s.key===climbKey(next.seat)):null;climbSide=climbSlot(next.seat);
       progress=next.progress||0;climbTarget=doing==='climb'&&!progress?1:null;localJump=next.jumpAt||0;
       if(doing&&doing!=='lounge'){
         if(!travelView)travelView={angle,tilt,wide};
@@ -455,7 +459,7 @@ export function createWorld(host,residents,callbacks) {
         else if(doing==='surf'){angle=next.yaw+Math.PI;tilt=.37;}
         else if(doing==='boat'){angle=next.yaw+Math.PI+.67;tilt=.43;}
         else if(doing==='ride'){angle=next.yaw+Math.PI;tilt=.47;}
-        else if(climbing){angle=climbing.land.yaw+Math.PI+.54;tilt=.42;}
+        else if(climbing){angle=(doing==='climb'?climbYaw(climbing,climbSide):climbing.land.yaw)+Math.PI+.54;tilt=.42;}
         wide=false;introView=false;callbacks.onCamera(false);if(!crossing)setCamera(0,true);
       }else if(travelView){
         if(crossing)tilt=travelView.tilt;else ({angle,tilt,wide}=travelView);
@@ -534,7 +538,7 @@ export function createWorld(host,residents,callbacks) {
     if(id==='lounge')return {...playPose(id,now,p.id),waveAt:p.waveAt};
     if(id==='climb'){
       const spot=climbSpots.find(s=>s.key===climbKey(p.seat));
-      if(spot)return {...p,...climbPose(spot,p.progress||0),activity:id,land:spot.land};
+      if(spot)return {...p,...climbPose(spot,p.progress||0,climbSlot(p.seat)),activity:id,land:spot.land};
     }
     if(id==='swim')return {...p,...playPose(id,now,p.id,p)};
     const floor=floorAt(p.x,p.z);
@@ -673,7 +677,7 @@ export function createWorld(host,residents,callbacks) {
     if(climbing){
       const base=doing==='boulder'?BOULDER.land:climbing;
       const bottom=new T.Vector3(base.x,0,base.z).project(camera);
-      const top=doing==='boulder'?boulderPose(1):climbPose(climbing,1),upper=new T.Vector3(top.x,top.y+(doing==='boulder'?.02:1.1),top.z).project(camera);
+      const top=doing==='boulder'?boulderPose(1):climbPose(climbing,1,climbSide),upper=new T.Vector3(top.x,top.y+(doing==='boulder'?.02:1.1),top.z).project(camera);
       climbTarget=T.MathUtils.clamp((pointer.y-bottom.y)/(upper.y-bottom.y),0,1);return;
     }
     if(picked&&(!doing||doing==='swim'&&['boat','surf'].includes(picked.id))){interact(picked);return;}
@@ -721,7 +725,7 @@ export function createWorld(host,residents,callbacks) {
       const pose=playPose(doing,nowMs,own?.id);
       avatar.position.set(pose.x,pose.y,pose.z);avatar.rotation.y=pose.yaw;
     }else if(climbing){
-      const pose=doing==='boulder'?boulderPose(progress):climbPose(climbing,progress);avatar.position.set(pose.x,pose.y,pose.z);avatar.rotation.y=pose.yaw;
+      const pose=doing==='boulder'?boulderPose(progress):climbPose(climbing,progress,climbSide);avatar.position.set(pose.x,pose.y,pose.z);avatar.rotation.y=pose.yaw;
       visitorFigure.root.rotation.set(pose.pitch,0,pose.roll,'YXZ');effort=climbRate;
     }else if(doing==='surf'||doing==='boat'){
       const riding=own?.seat==='play:boat:bow';
@@ -775,7 +779,7 @@ export function createWorld(host,residents,callbacks) {
   function stop(){
     running=false;cancelAnimationFrame(frame);keys.clear();cancelWalk();clearVisitors();
     ensemble={status:'offline',players:[],claims:{},ownId:null};own=null;nearest=hovered=spotlit=null;
-    pendingSeat=null;afterStand=null;seated=null;doing=null;climbing=null;climbTarget=null;progress=0;localJump=0;
+    pendingSeat=null;afterStand=null;seated=null;doing=null;climbing=null;climbSide=0;climbTarget=null;progress=0;localJump=0;
     stick.right=stick.forward=0;drive.reset();shorePending=false;outfit(null,'#e58a5f');callbacks.youLabel.textContent='You';
     if(travelView){({angle,tilt,wide}=travelView);travelView=null;}
   }

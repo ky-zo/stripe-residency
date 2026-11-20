@@ -1,8 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
 import { matchingResident, residents } from '../src/residents.js';
 import { SEATS, PLAY_SPOTS, npcLandPose } from '../src/island-life.js';
-import {beachRadius,climbPose,climbSpots,inLagoon,JUMP_MS,jumpLift,movementCredit,shoreActivity,SCOOTER_START,scooterSpot,waterAtCoast,waterEntry} from '../shared/mobility.js';
-import { activityId, activitySeat, climbKey } from '../shared/activities.js';
+import {beachRadius,CLIMBERS_PER_PALM,climbPose,climbSpots,inLagoon,JUMP_MS,jumpLift,movementCredit,shoreActivity,SCOOTER_START,scooterSpot,waterAtCoast,waterEntry} from '../shared/mobility.js';
+import { activityId, activitySeat, climbKey, climbSlot } from '../shared/activities.js';
 import { ballAt, colors, initialBall } from '../shared/ball.js';
 import { acceptsRoomPass, hasInvitation, invitationCookie, invitationPage } from '../shared/invitations.js';
 
@@ -219,7 +219,7 @@ export class Courtyard extends DurableObject {
         if(!spot||!Number.isFinite(msg.progress)||msg.progress<0||msg.progress>1||credit===null){
           send(ws,{type:'correct',player:publicPlayer(p)});return;
         }
-        progress=msg.progress;pose=id==='boulder'?boulderPose(progress):climbPose(spot,progress);
+        progress=msg.progress;pose=id==='boulder'?boulderPose(progress):climbPose(spot,progress,climbSlot(p.seat));
       }else{
         const speed={ride:8.8,swim:4.8,boat:10,surf:now-(p.strokeAt||0)<SURF_BOOST_MS+350?8.8:6.4,padel:5}[id]||6.1;
         credit=movementCredit(balance,elapsed,speed,dist(msg,p));
@@ -300,15 +300,17 @@ export class Courtyard extends DurableObject {
       let key=spot.key;
       if(spot.id==='boat')key=this.occupied('seat','play:boat:helm')?'bow':'helm';
       if(spot.id==='padel')key=this.occupied('seat','play:padel:south')?'north':'south';
-      const seat=activitySeat(spot.id,p.id,key);
+      let seat=activitySeat(spot.id,p.id,key);
+      // Climbers share a palm from different sides of the trunk.
+      for(let slot=1;spot.id==='climb'&&slot<CLIMBERS_PER_PALM&&this.occupied('seat',seat,p);slot++)seat=activitySeat('climb',p.id,key,slot);
       if(this.occupied('seat',seat,p)){
         if(['boulder','boat','padel'].includes(spot.id)){reject('activity',{boulder:'Someone is on the boulder.',boat:'Both canoe seats are taken.',padel:'Two players are already on court.'}[spot.id]);return;}
-        reject('activity',spot.id==='ride'?'Someone is riding the motorbike.':spot.id==='climb'?'Someone is on this palm. Try another tree.':'The sunbed is occupied.');return;
+        reject('activity',spot.id==='ride'?'Someone is riding the motorbike.':spot.id==='climb'?'This palm is full. Try another tree.':'The sunbed is occupied.');return;
       }
       let origin=spot.land;
       if(coastline)origin=waterAtCoast(p.x,p.z);
       else if(spot.id==='swim')origin=waterEntry(p.id);
-      else if(spot.id==='climb')origin=climbPose(spot,0);
+      else if(spot.id==='climb')origin=climbPose(spot,0,climbSlot(seat));
       else if(spot.id==='boulder')origin=boulderPose(0);
       else if(spot.id==='surf')origin=surfEntry([...this.sockets.values()].map(s=>s.p).filter(Boolean));
       else if(spot.id==='padel')origin=courtEntry(key);

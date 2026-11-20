@@ -16,7 +16,7 @@ Use Node 22.12 or later. Run `npm ci`, then `npm run dev`. The development comma
 
 ## The shared room
 
-The Cloudflare Worker serves the website and upgrades `/live` to a WebSocket. All connections route to one named Durable Object. It keeps players, guest details and character claims in memory for active connections. The shared beach ball and parked motorbike use the toys table. The canoe crew, padel rally and court record last for the active room. The room shares swimmer and rider positions, climbing progress and jump timing. Multiple players can swim together. Each climbable palm, work seat, the spare sunbed and the motorbike have one occupant at a time.
+The Cloudflare Worker serves the website and upgrades `/live` to a WebSocket. All connections route to one named Durable Object. It keeps players, guest details and character claims in memory for active connections. The shared beach ball and parked motorbike use the toys table. The canoe crew, padel rally and court record last for the active room. The room shares swimmer and rider positions, climbing progress and jump timing. Multiple players can swim together. Up to three people climb each palm, each from a different side of the trunk. Each work seat, the spare sunbed and the motorbike have one occupant at a time.
 
 Disconnecting releases the player's character and seat. An open tab can reintroduce its guest during a network interruption using its current page memory. Select Invite to copy the island link. Anyone with the link can join.
 

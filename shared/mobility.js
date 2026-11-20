@@ -27,9 +27,14 @@ export const climbSpots=PALMS.filter(p=>p.approach).map(palm=>{
   return {id:'climb',key:palm.key,label:'Coconut palm',palm,x:palm.x,z:palm.z,hitY:palm.height*.46,land:{x,z,yaw}};
 });
 
-export function climbPose(spot,progress) {
+// Up to three people share a palm, each gripping the trunk from a different side.
+const CLIMB_SIDES=[0,2.1,-2.1];
+export const CLIMBERS_PER_PALM=CLIMB_SIDES.length;
+export const climbYaw=(spot,slot=0)=>spot.land.yaw+(CLIMB_SIDES[slot]||0);
+
+export function climbPose(spot,progress,slot=0) {
   const t=.014+.66*Math.max(0,Math.min(1,progress));
-  const p=palmTrunk(spot.palm,t),yaw=spot.land.yaw;
+  const p=palmTrunk(spot.palm,t),yaw=climbYaw(spot,slot);
   const grip=.25+(.28-.17*Math.pow(t,.68))*Math.sqrt(spot.palm.height/4.6);
   const above=palmTrunk(spot.palm,Math.min(1,t+.96/spot.palm.height));
   const dx=above.x-p.x,dy=above.y-p.y,dz=above.z-p.z;

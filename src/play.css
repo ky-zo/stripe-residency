@@ -111,3 +111,13 @@ body.playing .jump-control{position:absolute;right:max(1.15rem,env(safe-area-ins
 .help-dialog .activity-list{grid-template-columns:repeat(2,minmax(0,1fr))}
 .sport-caption{position:absolute;z-index:3;left:50%;bottom:calc(max(.85rem,env(safe-area-inset-bottom)) + var(--action-height,2.7rem) + .66rem);transform:translateX(-50%);max-width:calc(100% - 10rem);width:max-content;padding:.34rem .80rem;text-align:center;line-height:1.25;border-radius:.75rem;color:#fff9e9;background:#304b3fee;font-size:.78rem;font-weight:600;pointer-events:none}
 @media(max-width:420px){.help-dialog .activity-list button{font-size:.80rem;padding:.50rem}.sport-caption{font-size:.73rem}}
+
+/* Keyboard hint for the nearest thing E will use. Touch screens use the action button instead. */
+.world-prompt{position:absolute;z-index:3;left:50%;top:63%;transform:translateX(-50%);display:flex;align-items:center;gap:.5rem;padding:.32rem .9rem .32rem .34rem;
+ border-radius:2rem;background:#273f31e8;color:#fffdf3;font-size:.9rem;font-weight:600;line-height:1.2;white-space:nowrap;pointer-events:none;
+ box-shadow:0 6px 22px #1b2c2440;animation:prompt-in .18s ease-out}
+.world-prompt kbd{display:grid;place-items:center;min-width:1.7rem;height:1.7rem;padding:0 .3rem;border:1px solid #fffdf3;border-bottom-width:3px;border-radius:.42rem;
+ background:#fdf8eb;color:#273f31;font:700 .86rem/1 var(--sans)}
+@keyframes prompt-in{from{opacity:0;transform:translate(-50%,.35rem)}}
+@media(prefers-reduced-motion:reduce){.world-prompt{animation:none}}
+@media(hover:none){.world-prompt{display:none!important}}
