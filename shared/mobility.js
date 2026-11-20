@@ -1,6 +1,12 @@
 export const SCOOTER_START = {x:1.34,z:5.82,yaw:Math.PI/2};
 export const JUMP_MS = 720;
 export const SWIM_LEVEL = -.64;
+// Each ring is a fraction of the irregular coast, with its sand height in world units.
+export const BEACH_PROFILE = [
+  [.92,0], [.962,-.036], [1.004,-.17], [1.042,-.41],
+  [1.083,-.57], [1.115,-.77], [1.205,-.965], [1.32,-1.52],
+];
+const KNEE_DEPTH=.30, STAND_DEPTH=.14, AXLE_DEPTH=.21;
 
 export const PALMS = [
   {x:-9.68,z:.57,height:4.42,reach:2.43,leanX:-.57,leanZ:.05,key:'west',approach:[-9.17,1.19]},
@@ -46,16 +52,35 @@ export function beachRadius(x,z){
   const nx=x/11.7,nz=z/8.15;
   return Math.hypot(nx,nz)/shoreline(Math.atan2(nz,nx));
 }
+export function nearbyBeach(x,z){
+  const scale=1.03/beachRadius(x,z);
+  return {x:x*scale,z:z*scale};
+}
 export function waterAtCoast(x,z){
   const scale=1.17/beachRadius(x,z);
   return {x:x*scale,z:z*scale,yaw:Math.atan2(x,z)};
 }
-export function landAtCoast(x,z){
-  const scale=.955/landRadius(x,z);
-  return {x:x*scale,z:z*scale};
+export function groundHeight(x,z) {
+  if((x/11.7)**2+(z/8.15)**2<.55)return 0;
+  const radius=beachRadius(x,z);
+  if(radius<=BEACH_PROFILE[0][0])return 0;
+  for(let i=1;i<BEACH_PROFILE.length;i++){
+    const [outer,low]=BEACH_PROFILE[i];
+    if(radius>outer)continue;
+    const [inner,high]=BEACH_PROFILE[i-1];
+    return high+(low-high)*(radius-inner)/(outer-inner);
+  }
+  return BEACH_PROFILE.at(-1)[1];
+}
+export const inLagoon=(x,z)=>(x/17.8)**2+(z/14.6)**2<=1;
+export function shoreActivity(current,x,z,jumpHeight=0) {
+  const depth=SWIM_LEVEL-groundHeight(x,z);
+  if(current==='swim')return depth<=STAND_DEPTH?null:'swim';
+  if(current==='ride')return depth>=AXLE_DEPTH?'swim':'ride';
+  return depth-jumpHeight>=KNEE_DEPTH?'swim':null;
 }
 export function canSwim(x,z) {
-  return (x/17.8)**2+(z/14.6)**2<=1 && beachRadius(x,z)>=1.12;
+  return inLagoon(x,z)&&shoreActivity('swim',x,z)==='swim';
 }
 
 export function waterEntry(id) {

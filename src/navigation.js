@@ -1,13 +1,15 @@
+import {inLagoon} from '../shared/mobility.js';
+
 const directions = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
 const squared = (a, b) => (a.x-b.x)**2 + (a.z-b.z)**2;
 
 export function createNavigation(obstacles, residents, options={}) {
-  const {step:STEP=.45,width:WIDTH=49,height:HEIGHT=33,clearance=.24}=options;
-  const canStand=options.canStand||function(x,z) {
-    if ((x/10.35)**2 + (z/6.66)**2 > 1) return false;
+  const {step:STEP=.45,width:WIDTH=81,height:HEIGHT=67,clearance=.24}=options;
+  function canStand(x,z) {
+    if (!inLagoon(x,z)) return false;
     if (obstacles.some(o => Math.abs(x-o.x) < o.w/2+clearance && Math.abs(z-o.z) < o.d/2+clearance)) return false;
     return !residents.some(p => (x-p.x)**2 + (z-p.z)**2 < .50**2);
-  };
+  }
   const nodes = Array.from({length: WIDTH*HEIGHT}, (_, id) => {
     const x = (id%WIDTH-(WIDTH-1)/2)*STEP;
     const z = (Math.floor(id/WIDTH)-(HEIGHT-1)/2)*STEP;

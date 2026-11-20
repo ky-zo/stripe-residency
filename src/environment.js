@@ -1,6 +1,6 @@
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { onMat, SEATS, WATER_Y, WORK_DESKS, WORK_MATS } from './island-life.js';
-import { PALMS, palmTrunk, shoreline } from '../shared/mobility.js';
+import { BEACH_PROFILE, PALMS, palmTrunk, shoreline } from '../shared/mobility.js';
 import { addShoreActivities } from './shore-art.js';
 
 const TAU = Math.PI * 2;
@@ -190,9 +190,10 @@ function makeWater(T, root) {
         float foam = (1.0-smoothstep(.002,.011,abs(radius-lap)))*(.22+.55*smoothstep(-.63,.62,sin(angle*8.0+time*.33)));
         colour = mix(colour,sun,min(.9,glints*.39 + beachRipples*.21 + foam));
         colour = mix(colour,horizon,smoothstep(26.0,110.0,length(eyePosition))*.76);
-        // Clear water at the swimming steps lets the figure's real submerged body show.
+        // Let shoes, wheels and wet sand show through the first few steps of surf.
+        float shallows = 1.0-smoothstep(1.19,1.29,radius);
         float cove = 1.0-smoothstep(.52,1.29,length((p-vec2(2.60,-10.55))/vec2(3.35,2.08)));
-        gl_FragColor = vec4(colour,mix(1.0,.53,cove));
+        gl_FragColor = vec4(colour,1.0-max(.38*shallows,.47*cove));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
@@ -278,15 +279,8 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
     return [11.7 * Math.cos(angle) * variation, height, 8.15 * Math.sin(angle) * variation];
   };
 
-  const strata = [
-    [0.92, 0, '#dcc59d'],
-    [0.962, -0.036, '#e5cba4'],
-    [1.004, -0.17, '#ead1ac'],
-    [1.042, -0.41, '#eed7b4'],
-    [1.083, -0.57, '#e8d3b0'],
-    [1.115, -0.77, '#d7c6a6'],
-  ];
-  const surfaceRings = [0,.19,.37,.57,.75,.92];
+  const sandBands=['#dcc59d','#e5cba4','#ead1ac','#eed7b4','#e8d3b0','#d7c6a6','#c6c4a4','#a0b5a5'];
+  const surfaceRings = [0,.19,.37,.57,.75,BEACH_PROFILE[0][0]];
   function sandTone(radius, i) {
     const [x,,z] = coastalRing(i,radius,0);
     const tint = .54 + .21*Math.sin(x*.65+.64*Math.cos(z)) + .20*Math.sin(z*.72-x*.29);
@@ -298,10 +292,10 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
       const r0=surfaceRings[k-1], r1=surfaceRings[k];
       landscape.quad(coastalRing(i,r0,0),coastalRing(i+1,r0,0),coastalRing(i+1,r1,0),coastalRing(i,r1,0),[sandTone(r0,i),sandTone(r0,i+1),sandTone(r1,i+1),sandTone(r1,i)]);
     }
-    for (let j = 1; j < strata.length; j++) {
-      const [r1, h1] = strata[j - 1], [r2, h2, tone] = strata[j];
-      const innerA=j===1 ? sandTone(r1,i) : strata[j-1][2];
-      const innerB=j===1 ? sandTone(r1,i+1) : strata[j-1][2];
+    for (let j = 1; j < BEACH_PROFILE.length; j++) {
+      const [r1, h1] = BEACH_PROFILE[j-1], [r2, h2] = BEACH_PROFILE[j], tone=sandBands[j];
+      const innerA=j===1 ? sandTone(r1,i) : sandBands[j-1];
+      const innerB=j===1 ? sandTone(r1,i+1) : sandBands[j-1];
       landscape.quad(coastalRing(i, r1, h1), coastalRing(i + 1, r1, h1), coastalRing(i + 1, r2, h2), coastalRing(i, r2, h2), [innerA,innerB,tone,tone]);
     }
   }

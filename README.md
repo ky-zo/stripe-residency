@@ -4,7 +4,7 @@ A shared Three.js island in Bali. Enter with the residency invitation and choose
 
 Entering fills the screen with the island. The floating resident strip opens profiles while you play. Tap a destination, use the touch joystick, or move with WASD or the arrow keys. Drag to look around. Space or **Jump** makes your figure jump. Q or **Wave** waves to everyone nearby.
 
-Open **Activities** or tap a place in the world to swim from the jetty, climb a coconut palm, ride the teal QuackParty motorbike, lounge on a sunbed, or work at a table. Walk into the sea at an open beach, steer freely in the water, and swim back onto the sand. Push up or down on a palm to change your grip. On the bike, forward accelerates, backward brakes and reverses, and left or right steers. **Park motorbike** leaves it where another player can pick it up.
+Open **Activities** or tap a place in the world to swim from the cove, climb a coconut palm, ride the teal QuackParty motorbike, lounge on a sunbed, or work at a table. Walk down the beach and wade into the shallows. At knee depth your figure starts swimming. Swim back toward the sand to stand up again. Push up or down on a palm to change your grip. On the bike, forward accelerates, backward brakes and reverses, and left or right steers. **Park motorbike** leaves it for the next rider. Drive into the surf and you start swimming where you splashed in. The shared scooter returns to its island parking spot.
 
 ## Run locally
 

@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { residents } from '../src/residents.js';
 import { SEATS, PLAY_SPOTS, npcLandPose } from '../src/island-life.js';
-import {beachRadius,canSwim,climbPose,climbSpots,JUMP_MS,landRadius,SCOOTER_START,scooterSpot,waterAtCoast,waterEntry} from '../shared/mobility.js';
+import {beachRadius,climbPose,climbSpots,inLagoon,JUMP_MS,jumpLift,landRadius,shoreActivity,SCOOTER_START,scooterSpot,waterAtCoast,waterEntry} from '../shared/mobility.js';
 import { activityId, activitySeat, climbKey } from '../shared/activities.js';
 import { ballAt, colors, initialBall } from '../shared/ball.js';
 import { acceptsRoomPass, hasInvitation, invitationCookie, invitationPage } from '../shared/invitations.js';
@@ -115,12 +115,15 @@ export class Courtyard extends DurableObject {
     if(id==='ride')return scooterSpot(this.scooter);
     return PLAY_SPOTS.find(s=>s.id===id);
   }
+  parkScooter({x,z,yaw}){
+    this.scooter={x,z,yaw};
+    this.sql.exec('INSERT OR REPLACE INTO toys (id,pose) VALUES (2,?)',JSON.stringify(this.scooter));
+  }
   dismount(p,exit){
     const id=activityId(p.seat);
     if(id==='ride'){
-      this.scooter={x:p.x,z:p.z,yaw:p.yaw};
-      this.sql.exec('INSERT OR REPLACE INTO toys (id,pose) VALUES (2,?)',JSON.stringify(this.scooter));
-      if(exit&&finite(exit.x,exit.z)&&dist(exit,p)<1.1&&(exit.x/10.4)**2+(exit.z/6.7)**2<1.02){
+      this.parkScooter(p);
+      if(exit&&finite(exit.x,exit.z)&&dist(exit,p)<1.1&&inLagoon(exit.x,exit.z)&&!shoreActivity(null,exit.x,exit.z)){
         p.x=signed(exit.x);p.z=signed(exit.z);
       }
     }else if(id==='swim'&&exit&&finite(exit.x,exit.z)&&beachRadius(p.x,p.z)<1.22&&landRadius(exit.x,exit.z)<1.01&&dist(exit,p)<5.3){
@@ -172,10 +175,10 @@ export class Courtyard extends DurableObject {
     const reject=(code,text)=>send(ws,{type:'error',code,text});
     if(msg.type==='ping'){this.remember(p,ws);send(ws,{type:'pong',serverTime:now});return;}
     if(msg.type==='move'){
-      if(!finite(msg.x,msg.z,msg.yaw)||now-p.lastMove<45)return;
+      if(!finite(msg.x,msg.z,msg.yaw))return;
       const id=activityId(p.seat),elapsed=(now-p.lastMove)/1000;
       if(p.seat!==null&&!['swim','ride','climb'].includes(id))return;
-      let pose={x:msg.x,z:msg.z,yaw:msg.yaw},progress=0;
+      let pose={x:msg.x,z:msg.z,yaw:msg.yaw},progress=0,nextActivity=id;
       if(id==='climb'){
         const spot=this.playSpot(id,climbKey(p.seat));
         if(!spot||!Number.isFinite(msg.progress)||msg.progress<0||msg.progress>1||Math.abs(msg.progress-(p.progress||0))>elapsed*.8+.09){
@@ -183,11 +186,20 @@ export class Courtyard extends DurableObject {
         }
         progress=msg.progress;pose=climbPose(spot,progress);
       }else{
-        const valid=id==='swim'?canSwim(msg.x,msg.z):(msg.x/10.6)**2+(msg.z/6.9)**2<1.035;
         const speed=id==='ride'?8.8:id==='swim'?4.8:6.1;
-        if(!valid||dist(msg,p)>Math.min(23,elapsed*speed+1.1)){send(ws,{type:'correct',player:publicPlayer(p)});return;}
+        if(!inLagoon(msg.x,msg.z)||dist(msg,p)>Math.min(23,elapsed*speed+1.1)){send(ws,{type:'correct',player:publicPlayer(p)});return;}
+        nextActivity=shoreActivity(id,msg.x,msg.z,jumpLift(p.jumpAt,now));
       }
+      if(elapsed<.045&&nextActivity===id)return;
       Object.assign(p,{x:signed(pose.x),z:signed(pose.z),yaw:signed(Math.atan2(Math.sin(pose.yaw),Math.cos(pose.yaw))),progress,walking:msg.walking===true,lastMove:now});
+      if(nextActivity!==id){
+        p.seat=nextActivity==='swim'?activitySeat('swim',p.id):null;p.jumpAt=0;
+        this.ctx.storage.transactionSync(()=>{
+          if(id==='ride')this.parkScooter(SCOOTER_START);
+          this.persist(p);
+        });
+        this.remember(p,ws);this.changed();return;
+      }
       this.remember(p,ws);this.broadcast({type:'move',id:p.id,x:p.x,z:p.z,yaw:p.yaw,progress,walking:p.walking,at:now},ws);return;
     }
     if(msg.type==='jump'){
@@ -243,6 +255,7 @@ export class Courtyard extends DurableObject {
       Object.assign(p,{seat:String(seat.id),x:seat.x,z:seat.z,yaw:seat.facing,walking:false});
     }else if(msg.type==='activity'){
       const spot=this.playSpot(msg.id,msg.key);
+      // Tabs loaded before depth-based movement still send a separate beach-entry request.
       const coastline=spot?.id==='swim'&&msg.shore===true&&landRadius(p.x,p.z)>.90;
       if(!spot||p.seat!==null||(!coastline&&dist(p,spot.land)>2.8)){reject('activity','Walk up to the activity first.');return;}
       const seat=activitySeat(spot.id,p.id,spot.key);

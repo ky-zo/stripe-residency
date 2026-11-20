@@ -198,7 +198,7 @@ export function playPose(id, serverTimeMs, playerId='guest',position=null) {
     return {x:bed.x,z:bed.z,y:0,yaw:bed.facing,walking:false,seated:true,activity:'lounge',land:PLAY_SPOTS[0].land};
   }
   if(id!=='swim')return null;
-  const p=position&&Math.hypot(position.x/11.7,position.z/8.15)>.9?position:waterEntry(playerId);
+  const p=position||waterEntry(playerId);
   return {x:p.x,z:p.z,y:WATER_Y+.024*Math.sin(serverTimeMs*.0029),yaw:p.yaw,walking:Boolean(p.walking),activity:'swim',land:PLAY_SPOTS[1].land};
 }
 

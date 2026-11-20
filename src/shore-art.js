@@ -53,14 +53,17 @@ function swimmerWakes(T,root) {
       for(const [id,item] of visible)if(serverTimeMs-item.last>1100)clear(id);
       lastSweep=serverTimeMs;
     }
-    if(!pose||pose.activity!=='swim'){clear(key);return;}
+    if(!pose||(!pose.wading&&pose.activity!=='swim')){clear(key);return;}
     const item=visible.get(key)||create(key);
     item.last=serverTimeMs;
     item.wake.position.set(pose.x,WATER_Y+.020,pose.z);
     item.wake.rotation.y=pose.yaw;
     const time=(serverTimeMs%120000)/1000;
     const pulse=.5+.5*Math.sin(time*3.45);
-    item.trails.scale.set(.91+.10*pulse,1,.94+.11*pulse);
+    const size=pose.wading?(pose.walking?.58:.39):1;
+    item.trails.scale.set((.91+.10*pulse)*size,1,(.94+.11*pulse)*size);
+    item.drops.visible=!pose.wading;
+    if(pose.wading)return;
     for(let n=0;n<6;n++){
       const side=n%2 ? 1 : -1;
       const phase=(time*.85+(n%2)*.5+Math.floor(n/2)*.073)%1;
