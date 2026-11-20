@@ -1,12 +1,15 @@
 import * as T from 'three';
 import { buildEnvironment } from './environment.js';
 import { createFigure } from './models.js';
+import { createDrive } from './drive.js';
+import { createScooter, SCOOTER_RIG } from './scooter.js';
+import { beachRadius, canSwim, landAtCoast, landRadius, palmTrunk, climbSpots, climbPose, jumpLift, JUMP_MS, SCOOTER_START, scooterSpot, SWIM_LEVEL, waterEntry } from '../shared/mobility.js';
 import { createNavigation } from './navigation.js';
 
 import { HOME, PLAY_SPOTS, SWIMMER_INDEX, npcPose, playPose, createBeachBall } from './island-life.js';
 import { ballAt, initialBall } from '../shared/ball.js';
 import {appearanceKey,memberHandle} from '../shared/members.js';
-import {activityId,activitySeat} from '../shared/activities.js';
+import {activityId,activitySeat,climbKey} from '../shared/activities.js';
 
 const movementKeys=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'];
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -49,11 +52,31 @@ export function createWorld(host,residents,callbacks) {
     addTarget(bodyHit,home.x,.86,home.z,info);residentHits.push(hitObjects.at(-1));
   }
   const seats=environment.seats.map(s=>({...s,type:'seat'}));
-  const spots=PLAY_SPOTS.map(s=>({...s,type:'activity'}));
+  const parkedSpot={...scooterSpot(),type:'activity'};
+  const spots=[...PLAY_SPOTS,...climbSpots].map(s=>({...s,type:'activity'})).concat(parkedSpot);
+  let scooter,vehicleLoad;
+  function loadBike(){
+    if(scooter)scene.remove(scooter.root);
+    scooter=createScooter(T);scene.add(scooter.root);vehicleLoad='loading';
+    scooter.ready.then(()=>{vehicleLoad='ready';}).catch(()=>{vehicleLoad='failed';});
+  }
+  loadBike();
+  const drive=createDrive();
+  const waterPlane=new T.Plane(new T.Vector3(0,1,0),-SWIM_LEVEL);
+  let scooterHit,climbing=null,progress=0,climbTarget=null,climbRate=0,waterDestination=null,localJump=0;
+  const stick={right:0,forward:0};
   for(const spot of spots){
-    const area=spot.id==='lounge'?new T.BoxGeometry(.94,.72,1.92):new T.SphereGeometry(.53,10,8);
+    const area=spot.id==='climb'?new T.CylinderGeometry(.42,.54,spot.palm.height*.95,9):
+      spot.id==='ride'?new T.BoxGeometry(.84,1.12,1.75):
+      spot.id==='lounge'?new T.BoxGeometry(.94,.72,1.92):new T.SphereGeometry(.53,10,8);
     const mesh=addTarget(area,spot.x,spot.hitY,spot.z,spot);
     if(spot.id==='lounge')mesh.rotation.y=spot.land.yaw-Math.PI;
+    if(spot.id==='ride')scooterHit=mesh;
+    if(spot.id==='climb'){
+      const top=palmTrunk(spot.palm,.93),dx=top.x-spot.x,dz=top.z-spot.z;
+      mesh.position.set(spot.x+dx/2,top.y/2,spot.z+dz/2);
+      mesh.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),new T.Vector3(dx,top.y,dz).normalize());
+    }
   }
   const chairHit=new T.CylinderGeometry(.48,.48,.85,10);
   seats.forEach(s=>addTarget(chairHit,s.x,.43,s.z,s));
@@ -65,6 +88,8 @@ export function createWorld(host,residents,callbacks) {
   hitLayer.updateMatrixWorld(true);
   // Paths use the island's permanent furniture. Passing residents give one another room.
   const nav=createNavigation(environment.obstacles,[]);
+  const roads=createNavigation(environment.obstacles,[],{clearance:.33});
+  const sea=createNavigation([],[],{step:.48,width:79,height:65,canStand:canSwim});
   const avatar=new T.Group();scene.add(avatar);
   avatar.position.set(.08,0,5.25);avatar.rotation.y=-.48;
   function outfit(handle,color,appearance){
@@ -82,7 +107,7 @@ export function createWorld(host,residents,callbacks) {
   let running=false,blocked=false,frame=0,last=0,elapsed=0,shadowAt=0;
   let route=[],arrival=null,seated=null,doing=null,afterStand=null,nearest=null,hovered=null,spotlit=null,spotlightUntil=0;
   let angle=.105,tilt=.55,wide=!mobile,introView=!mobile,pointerStart=null,width=0,height=0;
-  let shoreView=null;
+  let travelView=null,orbitManuallyUntil=0,beachEntry=false;
   let orbitRadius=0,following=null,repathAt=0,pendingSeat=null;
   const keys=new Set(),cameraFocus=new T.Vector3(0,.57,.4),desired=new T.Vector3(),offset=new T.Vector3();
   const projection=new T.Vector3(),groundHit=new T.Vector3();
@@ -98,8 +123,13 @@ export function createWorld(host,residents,callbacks) {
     const narrow=camera.aspect<.95;
     const follow=wide?.04:(narrow?.88:.68);
     const trackSwim=doing==='swim'&&!wide;
-    desired.set(p.x*(trackSwim?.98:follow),wide?1.0:trackSwim?-.20:.79,p.z*(trackSwim?.99:follow)+(trackSwim?.55:wide?-.62:-.65));
-    const smoothing=snap || reduced?1:1-Math.exp(-dt*3.7);
+    const active=!wide&&(trackSwim||doing==='ride'||doing==='climb');
+    if(doing==='ride'&&!wide&&!pointerStart&&elapsed>orbitManuallyUntil&&Math.abs(drive.speed)>.20){
+      const behind=avatar.rotation.y+Math.PI-angle;
+      angle+=Math.atan2(Math.sin(behind),Math.cos(behind))*(1-Math.exp(-dt*2.6));
+    }
+    desired.set(active?p.x:p.x*follow,wide?1.0:doing==='climb'?p.y+1.16:trackSwim?-.20:.85,active?p.z:p.z*follow+(wide?-.62:-.65));
+    const smoothing=snap||reduced?1:1-Math.exp(-dt*(active?9:3.7));
     cameraFocus.lerp(desired,smoothing);
     const horizontalRadius=wide?Math.max(15.8,12.6/camera.aspect):trackSwim?(narrow?6.3:8.6):narrow?8.6:12.15;
     orbitRadius+= (horizontalRadius-orbitRadius)*(snap||!orbitRadius||reduced?1:1-Math.exp(-dt*3.1));
@@ -142,23 +172,63 @@ export function createWorld(host,residents,callbacks) {
   }
   function cancelWalk() { route=[];arrival=null;following=null;marker.visible=false; }
   function followCamera(){if(introView){introView=false;wide=false;callbacks.onCamera(false);}}
-  function manualVector(){
-    const lr=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));
-    const fb=Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));
-    if(!lr&&!fb)return null;
-    const len=Math.hypot(lr,fb);
-    return {x:(lr*Math.cos(angle)+fb*Math.sin(angle))/len,z:(fb*Math.cos(angle)-lr*Math.sin(angle))/len};
+  function inputAxes(){
+    const right=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));
+    const forward=Number(keys.has('w')||keys.has('arrowup'))-Number(keys.has('s')||keys.has('arrowdown'));
+    return {right:right||stick.right,forward:forward||stick.forward};
+  }
+  function jump(){
+    if(!running||blocked||doing||seated||pendingSeat||ensemble.status!=='online')return;
+    const now=room.now();
+    if(now-Math.max(localJump,own?.jumpAt||0)<JUMP_MS+85)return;
+    if(room.trigger('jump'))localJump=now;
   }
   function move(dt) {
-    if(seated || doing || pendingSeat || blocked || (ensemble.status!=='online'&&own))return false;
-    const p=avatar.position,manual=manualVector();
+    if(seated||doing==='lounge'||pendingSeat||blocked||(ensemble.status!=='online'&&own))return false;
+    const p=avatar.position,axes=inputAxes();
+    if(doing==='climb'&&climbing){
+      const before=progress;
+      if(Math.abs(axes.forward)>.09){climbTarget=null;progress+=axes.forward*dt*.36;}
+      else if(climbTarget!==null){
+        progress+=T.MathUtils.clamp(climbTarget-progress,-dt*.40,dt*.40);
+        if(Math.abs(progress-climbTarget)<.001){
+          if(climbTarget===0)room.trigger('stand');
+          climbTarget=null;
+        }
+      }
+      progress=T.MathUtils.clamp(progress,0,1);
+      climbRate=T.MathUtils.clamp((progress-before)/Math.max(.001,dt*.39),-1,1);
+      return Math.abs(progress-before)>.0001;
+    }
+    const manual=Math.hypot(axes.right,axes.forward)>.08;
+    if(manual){followCamera();cancelWalk();}
+    if(doing==='ride'){
+      const moving=drive.step(avatar,roads,dt,axes,route);
+      if(!route.length)marker.visible=false;
+      return moving;
+    }
+    const travel=doing==='swim'?sea:nav;
     if(manual){
-      followCamera();cancelWalk();
-      const step=3.65*dt,dx=manual.x*step,dz=manual.z*step;
+      const len=Math.max(1,Math.hypot(axes.right,axes.forward)),lr=axes.right/len,fb=-axes.forward/len;
+      const x=lr*Math.cos(angle)+fb*Math.sin(angle),z=fb*Math.cos(angle)-lr*Math.sin(angle);
+      const step=(doing==='swim'?2.85:3.65)*dt,dx=x*step,dz=z*step;
+      const nextX=p.x+dx,nextZ=p.z+dz;
+      if(ensemble.status==='online'&&!doing&&landRadius(nextX,nextZ)>1&&landRadius(nextX,nextZ)>landRadius(p.x,p.z)){
+        const spot=spots.find(s=>s.id==='swim');
+        room.pose(p.x,p.z,avatar.rotation.y,false,true);
+        if(room.trigger('activity',{id:'swim',shore:true})){pendingSeat=spot;beachEntry=true;}
+        return false;
+      }
+      if(doing==='swim'&&beachRadius(nextX,nextZ)<1.12){
+        const shore=landAtCoast(p.x,p.z);
+        const exit=nav.canStand(shore.x,shore.z)?shore:nav.nearest(shore);
+        if(exit&&distance(exit,p)<5.2&&room.trigger('stand',{exit:{x:exit.x,z:exit.z}}))pendingSeat={id:'shore'};
+        return false;
+      }
       const lastX=p.x,lastZ=p.z;
-      if(nav.canStand(p.x+dx,p.z))p.x+=dx;
-      if(nav.canStand(p.x,p.z+dz))p.z+=dz;
-      turn(Math.atan2(manual.x,manual.z),dt);
+      if(travel.canStand(p.x+dx,p.z))p.x+=dx;
+      if(travel.canStand(p.x,p.z+dz))p.z+=dz;
+      turn(Math.atan2(x,z),dt);
       return Math.abs(p.x-lastX)+Math.abs(p.z-lastZ)>.001;
     }
     if(following && elapsed>repathAt){
@@ -169,7 +239,7 @@ export function createWorld(host,residents,callbacks) {
       if(next && (!route.length||distance(next,route.at(-1))>.44)){go(next,()=>finishFind(target),true);following=target;}
     }
     if(!route.length)return false;
-    let budget=3.85*dt;
+    let budget=(doing==='swim'?2.85:3.85)*dt;
     while(route.length && budget>0){
       const next=route[0],dx=next.x-p.x,dz=next.z-p.z,len=Math.hypot(dx,dz);
       if(len>.02)turn(Math.atan2(dx,dz),dt);
@@ -183,12 +253,13 @@ export function createWorld(host,residents,callbacks) {
     return true;
   }
   function go(point,done=null,mark=true) {
-    if(seated||doing)return false;
+    if(seated||doing==='climb'||doing==='lounge')return false;
     followCamera();
-    const points=nav.path(avatar.position,point);
+    const map=doing==='swim'?sea:doing==='ride'?roads:nav;
+    const points=map.path(avatar.position,point);
     if(!points?.length)return false;
     following=null;route=points;arrival=done;const end=points.at(-1);
-    marker.visible=mark;marker.position.set(end.x,.042,end.z);
+    marker.visible=mark;marker.position.set(end.x,doing==='swim'?SWIM_LEVEL+.045:.042,end.z);
     return true;
   }
   function seatOwner(seat){return ensemble.players.find(p=>p.seat!==null&&String(p.seat)===String(seat.id));}
@@ -209,21 +280,32 @@ export function createWorld(host,residents,callbacks) {
     if(immediate&&distance(seat,p)<2.15)request();
     else if(go(approach,request))callbacks.notice('Walking to '+seat.label);
   }
-  function takeActivity(id){
+  function takeActivity(id,key=null,swimTarget=null){
     if(doing===id||pendingSeat)return;
-    if(seated||doing){afterStand=()=>takeActivity(id);stand();return;}
+    if(id==='ride'&&vehicleLoad==='failed'){loadBike();callbacks.notice('Loading the motorbike…');}
+    if(seated||doing){afterStand=()=>takeActivity(id,key,swimTarget);stand();return;}
     if(ensemble.status!=='online'){callbacks.notice('Waiting for the shared island');return;}
-    const spot=spots.find(s=>s.id===id);if(!spot)return;
-    if(id==='lounge'&&ensemble.players.some(p=>p.seat===activitySeat(id,p.id))){callbacks.notice('The sunbed is occupied. The cove is open for a swim.');return;}
+    const candidates=spots.filter(s=>s.id===id&&(!key||s.key===key)).sort((a,b)=>distance(a.land,avatar.position)-distance(b.land,avatar.position));
+    const spot=candidates.find(s=>!ensemble.players.some(p=>p.seat===activitySeat(id,own?.id,s.key)));
+    if(!spot){callbacks.notice(id==='climb'?'This palm is occupied. Choose another tree.':id==='ride'?'Someone is riding the motorbike.':'The sunbed is occupied.');return;}
+    waterDestination=swimTarget;
     const request=()=>{
       pendingSeat=spot;
       const p=avatar.position;room.pose(p.x,p.z,avatar.rotation.y,false,true);
-      if(!room.trigger('activity',{id}))pendingSeat=null;
+      if(!room.trigger('activity',{id,key:spot.key}))pendingSeat=null;
     };
-    if(distance(spot.land,avatar.position)<.80)request();
-    else if(go(spot.land,request))callbacks.notice(id==='swim'?'Walking to the swimming cove':'Walking to the sunbed');
+    if(distance(spot.land,avatar.position)<.8)request();
+    else if(go(spot.land,request))callbacks.notice({swim:'Walking to the swimming cove',ride:'Walking to the motorbike',climb:'Walking to the palm',lounge:'Walking to the sunbed'}[id]);
   }
-  function stand(){if(seated||doing)room.trigger('stand');}
+  function stand(){
+    if(doing==='climb'&&!afterStand&&progress>.025){climbTarget=0;callbacks.notice('Climbing down');}
+    else if(doing==='ride'){
+      const p=avatar.position,yaw=avatar.rotation.y;
+      const exits=[1,-1].map(side=>({x:p.x+side*.72*Math.cos(yaw),z:p.z-side*.72*Math.sin(yaw)}));
+      const exit=exits.find(q=>nav.canStand(q.x,q.z));
+      room.pose(p.x,p.z,yaw,false,true);room.trigger('stand',{exit});
+    }else if(seated||doing)room.trigger('stand');
+  }
   function approachFor(target,from) {
     if(target.land)return target.land;
     const candidates=Array.from({length:12},(_,i)=>({x:target.x+Math.sin(i*Math.PI/6)*.96,z:target.z+Math.cos(i*Math.PI/6)*.96}));
@@ -257,7 +339,7 @@ export function createWorld(host,residents,callbacks) {
     if(!point||blocked||seated||doing)return;
     if(point.type==='resident'){cancelWalk();callbacks.onResident(point.resident.handle);}
     else if(point.type==='seat')takeSeat(point);
-    else if(point.type==='activity')takeActivity(point.id);
+    else if(point.type==='activity')takeActivity(point.id,point.key);
     else if(point.type==='ball')kick();
   }
   function snap(p){avatar.position.set(p.x,p.y||0,p.z);avatar.rotation.y=p.yaw;shadowAt=-10;}
@@ -270,6 +352,10 @@ export function createWorld(host,residents,callbacks) {
   }
   function applyRoom(state,welcome=false){
     ensemble=state;
+    Object.assign(parkedSpot,scooterSpot(state.scooter||SCOOTER_START));
+    parkedSpot.visible=!state.players.some(p=>activityId(p.seat)==='ride');
+    scooterHit.layers.set(parkedSpot.visible?0:1);
+    scooterHit.position.set(parkedSpot.x,.58,parkedSpot.z);scooterHit.rotation.y=parkedSpot.land.yaw;
     if(state.status!=='online'){pendingSeat=null;return;}
     const next=state.players.find(p=>p.id===state.ownId);
     if(!next)return;
@@ -278,14 +364,22 @@ export function createWorld(host,residents,callbacks) {
     const prev=own;own=next;ballState=state.ball||initialBall;
     outfit(next.handle,next.color,member?.appearance);
     if(welcome||!prev||next.handle!==prev.handle||next.seat!==prev.seat){
-      cancelWalk();pendingSeat=null;snap(next);
+      cancelWalk();pendingSeat=null;drive.reset();snap(next);
       const seat=seats.find(s=>String(s.id)===String(next.seat))||null;
       const oldSeat=seated,oldActivity=doing;seated=seat;doing=activityId(next.seat);ring.visible=!seat&&!doing;
-      if(doing==='swim'&&oldActivity!=='swim'){
-        shoreView={angle,tilt,wide};angle=Math.PI-.31;tilt=.39;wide=false;introView=false;callbacks.onCamera(false);
-        snap(playPose('swim',room.now(),next.id));setCamera(0,true);
-      }else if(doing!=='swim'&&shoreView){
-        ({angle,tilt,wide}=shoreView);shoreView=null;callbacks.onCamera(wide);setCamera(0,true);
+      climbing=doing==='climb'?climbSpots.find(s=>s.key===climbKey(next.seat)):null;
+      progress=next.progress||0;climbTarget=climbing&&!progress?1:null;localJump=next.jumpAt||0;
+      if(['swim','climb','ride'].includes(doing)){
+        if(!travelView)travelView={angle,tilt,wide};
+        if(doing==='swim'){
+          if(!beachEntry)angle=Math.PI-.31;tilt=.39;beachEntry=false;
+          snap({...((Math.hypot(next.x/11.7,next.z/8.15)>.9)?next:waterEntry(next.id)),y:SWIM_LEVEL});
+        }else if(doing==='ride'){angle=next.yaw+Math.PI;tilt=.47;}
+        else if(climbing){angle=climbing.land.yaw+Math.PI+.54;tilt=.42;}
+        wide=false;introView=false;callbacks.onCamera(false);setCamera(0,true);
+        if(doing==='swim'&&waterDestination){go(waterDestination);waterDestination=null;}
+      }else if(travelView){
+        ({angle,tilt,wide}=travelView);travelView=null;callbacks.onCamera(wide);setCamera(0,true);
       }
       if(seat&&!oldSeat)callbacks.onSit(seat);
       else if(!seat&&oldSeat)callbacks.onLeaveSeat();
@@ -345,13 +439,37 @@ export function createWorld(host,residents,callbacks) {
     root.position.x+=(p.x-root.position.x)*alpha;root.position.z+=(p.z-root.position.z)*alpha;
     root.position.y=p.y||0;
     const turnBy=Math.atan2(Math.sin(p.yaw-root.rotation.y),Math.cos(p.yaw-root.rotation.y));
-    root.rotation.y+=turnBy*alpha;
+    root.rotation.order='YXZ';
+    root.rotation.y+=turnBy*alpha;root.rotation.x=p.pitch||0;root.rotation.z=p.roll||0;
     const walk=Boolean(p.walking&&(!p.at||now-p.at<750));
-    fig.animate(reduced&&!walk&&!p.waveAt?0:now/1000,walk,Boolean(p.seated),envelope(p.waveAt,now),p.activity);
+    fig.animate(reduced&&!walk&&!p.waveAt&&!['climb','ride','jump','swim'].includes(p.activity)?0:now/1000,walk,Boolean(p.seated),envelope(p.waveAt,now),p.activity);
   }
   function peerPose(p,now){
     const id=activityId(p.seat);
-    return id?{...playPose(id,now,p.id),waveAt:p.waveAt}:{...p,seated:p.seat!==null};
+    if(id==='lounge')return {...playPose(id,now,p.id),waveAt:p.waveAt};
+    if(id==='climb'){
+      const spot=climbSpots.find(s=>s.key===climbKey(p.seat));
+      if(spot)return {...p,...climbPose(spot,p.progress||0),activity:id,land:spot.land};
+    }
+    if(id==='swim')return {...p,...playPose(id,now,p.id,p)};
+    if(id==='ride')return {...p,y:SCOOTER_RIG.rider.y,activity:id};
+    const lift=p.seat===null?jumpLift(p.jumpAt,now):0;
+    return {...p,y:lift,activity:lift?'jump':'',seated:p.seat!==null};
+  }
+  function updateScooter(dt){
+    const rider=ensemble.players.find(p=>activityId(p.seat)==='ride');
+    const bike=scooter.root;
+    if(!rider){
+      bike.position.set(parkedSpot.x,0,parkedSpot.z);bike.rotation.y=parkedSpot.land.yaw;scooter.animate(dt,0,0);return;
+    }
+    const mine=rider.id===ensemble.ownId;
+    const rendered=mine?avatar:rider.handle?figures[byHandle.get(rider.handle).index].root:guests.get(rider.id)?.root;
+    if(!rendered)return;
+    bike.position.set(rendered.position.x,0,rendered.position.z);
+    const change=Math.atan2(Math.sin(rendered.rotation.y-bike.rotation.y),Math.cos(rendered.rotation.y-bike.rotation.y));
+    bike.rotation.y=rendered.rotation.y;
+    scooter.animate(dt,mine?drive.speed:rider.walking?3:0,mine?drive.steer:T.MathUtils.clamp(-change/Math.max(.01,dt)*.45,-1,1));
+    const body=mine?visitorFigure.root:rendered;body.rotation.z=scooter.riderFrame.rotation.z;
   }
   function positionTarget(info,hit,fig,pose){
     const {x,y,z}=fig.root.position;
@@ -447,7 +565,7 @@ export function createWorld(host,residents,callbacks) {
       const dx=e.clientX-pointerStart.x,dy=e.clientY-pointerStart.y;
       if(!pointerStart.drag && Math.hypot(dx,dy)>6)pointerStart.drag=true;
       if(pointerStart.drag){
-        hovered=null;host.classList.add('dragging');
+        hovered=null;host.classList.add('dragging');orbitManuallyUntil=elapsed+4;
         angle=pointerStart.angle-dx*.0065;tilt=T.MathUtils.clamp(pointerStart.tilt+dy*.004,.34,.98);
       }
     }else if(e.pointerType!=='touch'){
@@ -457,11 +575,22 @@ export function createWorld(host,residents,callbacks) {
   function pointerUp(e) {
     if(!pointerStart || pointerStart.id!==e.pointerId)return;
     const tap=!pointerStart.drag;pointerStart=null;host.classList.remove('dragging');
-    if(!tap || blocked || seated||doing)return;
+    if(!tap||blocked||seated||doing==='lounge')return;
     following=null;const picked=rayAt(e);
-    if(picked){interact(picked);return;}
-    if(ray.ray.intersectPlane(ground,groundHit) && (groundHit.x/10.9)**2+(groundHit.z/7.2)**2<1.08){
-      go({x:groundHit.x,z:groundHit.z});
+    if(doing==='climb'&&climbing){
+      const bottom=new T.Vector3(climbing.x,0,climbing.z).project(camera);
+      const top=climbPose(climbing,1),upper=new T.Vector3(top.x,top.y+1.1,top.z).project(camera);
+      climbTarget=T.MathUtils.clamp((pointer.y-bottom.y)/(upper.y-bottom.y),0,1);return;
+    }
+    if(!doing&&picked){interact(picked);return;}
+    if(ray.ray.intersectPlane(waterPlane,groundHit)&&canSwim(groundHit.x,groundHit.z)){
+      const target={x:groundHit.x,z:groundHit.z};
+      if(doing==='swim')go(target);else if(!doing)takeActivity('swim',null,target);
+      return;
+    }
+    if(ray.ray.intersectPlane(ground,groundHit)&&(groundHit.x/10.9)**2+(groundHit.z/7.2)**2<1.08){
+      const dest={x:groundHit.x,z:groundHit.z};
+      if(doing==='swim'){afterStand=()=>go(dest);stand();}else go(dest);
     }
   }
   host.addEventListener('pointerdown',down);host.addEventListener('pointermove',pointerMove);host.addEventListener('pointerup',pointerUp);
@@ -471,8 +600,9 @@ export function createWorld(host,residents,callbacks) {
     if(!running||blocked||e.metaKey||e.ctrlKey||e.altKey)return;
     const k=e.key.toLowerCase();
     if(movementKeys.includes(k)){e.preventDefault();keys.add(k);}
-    if(k==='e'&&!e.repeat){e.preventDefault();interact();}
-    if(e.code==='Space'&&!e.repeat){e.preventDefault();room.trigger('wave');}
+    if(k==='e'&&!e.repeat){e.preventDefault();if(doing)stand();else interact();}
+    if(e.code==='Space'){e.preventDefault();if(!e.repeat)jump();}
+    if(k==='q'&&!e.repeat){e.preventDefault();room.trigger('wave');}
   });
   window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
   host.addEventListener('blur',()=>keys.clear());
@@ -489,14 +619,27 @@ export function createWorld(host,residents,callbacks) {
     const nowMs=room.now();
     updateCast(dt,nowMs);
     const walking=move(dt);
-    const activityPose=doing&&playPose(doing,nowMs,own?.id);
-    if(activityPose){
-      avatar.position.set(activityPose.x,activityPose.y,activityPose.z);avatar.rotation.y=activityPose.yaw;
-      environment.setSwimmer(activityPose,nowMs,'self');
+    let visualActivity=doing,effort=walking;
+    visitorFigure.root.rotation.set(0,0,0,'YXZ');
+    if(doing==='lounge'){
+      const pose=playPose(doing,nowMs,own?.id);
+      avatar.position.set(pose.x,pose.y,pose.z);avatar.rotation.y=pose.yaw;
+    }else if(doing==='climb'&&climbing){
+      const pose=climbPose(climbing,progress);avatar.position.set(pose.x,pose.y,pose.z);avatar.rotation.y=pose.yaw;
+      visitorFigure.root.rotation.set(pose.pitch,0,pose.roll,'YXZ');effort=climbRate;
+    }else if(doing==='swim'){
+      const pose=playPose('swim',nowMs,own?.id,{x:avatar.position.x,z:avatar.position.z,yaw:avatar.rotation.y,walking});
+      avatar.position.y=pose.y;environment.setSwimmer(pose,nowMs,'self');
+    }else{
+      avatar.position.y=seated?0:jumpLift(Math.max(localJump,own?.jumpAt||0),nowMs);
+      if(avatar.position.y>.001)visualActivity='jump';
     }
-    visitorFigure.animate(reduced&&!walking&&!own?.waveAt?0:nowMs/1000,walking,Boolean(seated||activityPose?.seated),envelope(own?.waveAt,nowMs),doing);
-    if(own && !seated && !doing && !pendingSeat)room.pose(avatar.position.x,avatar.position.z,avatar.rotation.y,walking);
+    if(doing==='ride')effort=drive.speed/6.5;
+    visitorFigure.root.position.y=doing==='ride'?SCOOTER_RIG.rider.y:0;
+    visitorFigure.animate(reduced&&!walking&&!own?.waveAt&&!visualActivity?0:nowMs/1000,effort,Boolean(seated||doing==='lounge'),envelope(own?.waveAt,nowMs),visualActivity);
+    if(own&&!seated&&doing!=='lounge'&&!pendingSeat)room.pose(avatar.position.x,avatar.position.z,avatar.rotation.y,walking,false,progress);
     ring.position.set(avatar.position.x,.038,avatar.position.z);
+    ring.scale.setScalar(1+avatar.position.y*.15);updateScooter(dt);
     if(!reduced)environment.update(elapsed);
     if(elapsed-shadowAt>.33){renderer.shadowMap.needsUpdate=true;shadowAt=elapsed;}
     setCamera(dt);scanNearby();updateLabels();updateWaves(nowMs);
@@ -506,9 +649,12 @@ export function createWorld(host,residents,callbacks) {
     if(running)return;
     running=true;resize();last=performance.now();setCamera(0,true);updateCast(1,room.now());callbacks.onCamera(wide);scanNearby();frame=requestAnimationFrame(tick);
   }
-  function stop(){running=false;cancelAnimationFrame(frame);keys.clear();cancelWalk();hovered=null;pendingSeat=null;afterStand=null;seated=null;doing=null;own=null;if(shoreView){({angle,tilt,wide}=shoreView);shoreView=null;}}
-  function setBlocked(value){blocked=value;if(value){keys.clear();pointerStart=null;hovered=null;}else if(running)last=performance.now();}
+  function stop(){running=false;cancelAnimationFrame(frame);keys.clear();cancelWalk();hovered=null;pendingSeat=null;afterStand=null;seated=null;doing=null;climbing=null;climbTarget=null;progress=0;localJump=0;stick.right=stick.forward=0;drive.reset();waterDestination=null;beachEntry=false;own=null;if(travelView){({angle,tilt,wide}=travelView);travelView=null;}}
+  function setBlocked(value){blocked=value;if(value){keys.clear();stick.right=stick.forward=0;pointerStart=null;hovered=null;}else if(running)last=performance.now();}
   function toggleCamera(){introView=false;wide=!wide;callbacks.onCamera(wide);return wide;}
-  return {start,stop,find,takeSeat,takeActivity,stand,kick,interact:()=>interact(),toggleCamera,setBlocked,applyRoom,wave,
-    setBall(b){ballState=b;},correct(p){cancelWalk();snap(p);},clearRequest(){pendingSeat=null;}};
+  return {start,stop,find,takeSeat,takeActivity,stand,kick,jump,
+    setStick(right,forward){stick.right=right;stick.forward=forward;},
+    findGuest(id){const root=guests.get(id)?.root;if(!root)return;const dest=approachFor(root.position,avatar.position);if(dest){if(doing||seated){afterStand=()=>go(dest);stand();}else go(dest);}},
+    interact:()=>interact(),toggleCamera,setBlocked,applyRoom,wave,
+    setBall(b){ballState=b;},correct(p){cancelWalk();drive.reset();progress=p.progress||0;snap(p);},clearRequest(){pendingSeat=null;beachEntry=false;}};
 }

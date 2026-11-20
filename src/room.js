@@ -79,11 +79,11 @@ export function createRoom(events) {
       syncTime(m.serverTime);
       if(m.type==='welcome'){
         clearTimeout(admissionTimer);tries=0;ticket=m.ticket;try{sessionStorage.setItem(ticketKey,ticket);}catch{}
-        state={status:'online',ownId:m.id,players:m.players,claims:m.claims,members:m.members||[],ball:m.ball};
+        state={status:'online',ownId:m.id,players:m.players,claims:m.claims,members:m.members||[],ball:m.ball,scooter:m.scooter};
         lastSent=null;lastSendAt=0;rememberIdentity();events.state(state,true);sendMember();
         clearInterval(heartbeat);heartbeat=setInterval(()=>send({type:'ping'}),18000);
       }else if(m.type==='state'){
-        state={...state,players:m.players,claims:m.claims,members:m.members||[],ball:m.ball};rememberIdentity();events.state(state);
+        state={...state,players:m.players,claims:m.claims,members:m.members||[],ball:m.ball,scooter:m.scooter};rememberIdentity();events.state(state);
       }else if(m.type==='memberResult'){
         const request=pendingMember;
         if(!request || request.op!==m.op)return;
@@ -92,8 +92,10 @@ export function createRoom(events) {
         else storeMember({});
         request.resolve(saved.profile||null);
       }else if(m.type==='move'){
-        const who=state.players.find(p=>p.id===m.id);if(who)Object.assign(who,{x:m.x,z:m.z,yaw:m.yaw,walking:m.walking,at:m.at});
+        const who=state.players.find(p=>p.id===m.id);if(who)Object.assign(who,{x:m.x,z:m.z,yaw:m.yaw,progress:m.progress||0,walking:m.walking,at:m.at});
         events.move?.(m);
+      }else if(m.type==='jump'){
+        const who=state.players.find(p=>p.id===m.id);if(who)who.jumpAt=m.at;
       }else if(m.type==='wave'){
         const who=state.players.find(p=>p.id===m.id);if(who)who.waveAt=m.at;events.wave(m);
       }else if(m.type==='ball'){state.ball=m.ball;events.ball(m.ball);}
@@ -119,12 +121,12 @@ export function createRoom(events) {
     if(state.status!=='online'){events.error({code:'offline',text:'Joining the shared island. Try again in a moment.'});return false;}
     return send({type,...extra});
   }
-  function pose(x,z,yaw,walking,force=false){
+  function pose(x,z,yaw,walking,force=false,progress=0){
     if(state.status!=='online')return;
     const now=performance.now();
     if(!force&&now-lastSendAt<95)return;
-    if(!force&&lastSent&&Math.hypot(x-lastSent.x,z-lastSent.z)<.024&&Math.abs(yaw-lastSent.yaw)<.035&&walking===lastSent.walking)return;
-    if(send({type:'move',x,z,yaw,walking})){lastSent={x,z,yaw,walking};lastSendAt=now;}
+    if(!force&&lastSent&&Math.hypot(x-lastSent.x,z-lastSent.z)<.024&&Math.abs(yaw-lastSent.yaw)<.035&&Math.abs(progress-lastSent.progress)<.003&&walking===lastSent.walking)return;
+    if(send({type:'move',x,z,yaw,walking,progress})){lastSent={x,z,yaw,walking,progress};lastSendAt=now;}
   }
   return {open,close,trigger,pose,saveMember,removeMember:()=>saveMember({},'removeMember'),myMember:()=>saved.profile||null,now:()=>Date.now()+offset,get:()=>state};
 }

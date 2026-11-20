@@ -1,3 +1,5 @@
+import './play.css';
+import {bindThumbstick} from './play-controls.js';
 import { residents } from './residents.js';
 import { icon, renderIcons } from './icons.js';
 import { toggleSound } from './ambience.js';
@@ -58,7 +60,7 @@ function openMember(){memberEditor.open(room.myMember());}
 function showActivities(){if(!help.open)help.showModal();syncBlock();}
 function syncBlock(){world?.setBlocked(profile.open||help.open||pickerOpen||memberEditor.isOpen());}
 $('join-member').addEventListener('click',openMember);
-function updateParty(){party?.render({...room.get(),nearBall:ballNear,seated:sitting});}
+function updateParty(){party?.render({...room.get(),nearBall:ballNear,seated:sitting});if(inWorld)paintPresence();}
 function finishEntry(){
   if(!worldReady||!inWorld||room.get().status!=='online')return;
   if(requestedClaim){const h=requestedClaim;requestedClaim=null;room.trigger('claim',{handle:h});}
@@ -80,6 +82,7 @@ party=createPartyUI({residents,onClaim:handle=>room.trigger('claim',{handle}),on
   onInvite:copyInvite,onKick:()=>world?.kick(),onMember:openMember,onActivities:showActivities,paintAvatar:paintMember,
   onPicker(open){pickerOpen=open;syncBlock();if(!open&&inWorld&&!memberEditor.isOpen())host.focus({preventScroll:true});}});
 updateParty();
+new ResizeObserver(([bar])=>play.style.setProperty('--action-height',Math.ceil(bar.contentRect.height)+'px')).observe(play.querySelector('.party-controls'));
 function updateProfileClaim(){
   if(!activeResident)return;
   const state=room.get(),owner=state.claims[activeResident.handle];
@@ -102,8 +105,9 @@ function playAsResident(){
   if(!r)return;
   if(r.custom){dismiss(profile);openMember();return;}
   if(room.get().claims[r.handle]===room.get().ownId&&room.get().ownId){room.trigger('release');return;}
-  requestedClaim=r.handle;lastTrigger=null;dismiss(profile);
-  enterWorld(null,true);
+  lastTrigger=null;dismiss(profile);
+  if(inWorld){room.trigger('claim',{handle:r.handle});host.focus({preventScroll:true});}
+  else{requestedClaim=r.handle;enterWorld(null,true);}
 }
 $('claim-profile').addEventListener('click',playAsResident);
 
@@ -117,7 +121,7 @@ function addCard(r,i){
   const tile=document.createElement('span');tile.className='portrait-tile';
   const photo=new Image(544,544);photo.alt='';photo.loading=i<8?'eager':'lazy';photo.decoding='async';
   if(r.custom)cardObserver.observe(card);else photo.src=portraitUrl(r.handle);
-  const name=document.createElement('span');name.className='resident-name';name.textContent=r.name;
+  const name=document.createElement('span');name.className='resident-name';name.textContent=r.name;card.dataset.short=r.shortName||r.name;
   const role=document.createElement('span');role.className='resident-role';role.textContent=r.role;
   tile.append(photo);card.append(tile,name,role);card.addEventListener('click',()=>openProfile(r.handle,card));list.append(card);
   return {card,photo,name};
@@ -151,14 +155,66 @@ async function fetchDirectory(){
     if(response.ok){const data=await response.json();if(version===directoryVersion)renderMembers(data.members);}
   }catch{/* Live room snapshots also carry the directory. */}
 }
-function expandRoster(expanded) {
-  list.classList.toggle('expanded',expanded);
-  const button=$('all');button.setAttribute('aria-expanded',String(expanded));
-  const label=expanded?'Show less':'View all '+(residents.length+members.size);
-  if(button.lastElementChild?.textContent!==label)button.innerHTML=icon(expanded?'row':'grid')+'<span>'+label+'</span>';
+let hudFolded=false,gameFullscreen=false,originalScroll=0;
+const roster=$('residents'),prevButton=roster.querySelector('.hud-prev'),nextButton=roster.querySelector('.hud-next');
+const guestsOnHud=new Map();
+function paintPresence(){
+  const state=room.get(),online=new Set(),guests=new Set();
+  const atStart=list.scrollLeft<3;let changed=false;
+  for(const p of state.players){
+    const handle=p.handle||(p.memberId?memberHandle(p.memberId):null);
+    if(handle){online.add(handle);continue;}
+    guests.add(p.id);
+    if(guestsOnHud.has(p.id))continue;
+    const mine=p.id===state.ownId,name=mine?'You':'Guest';
+    const chip=document.createElement('button');chip.type='button';chip.className='resident hud-guest';
+    chip.dataset.short=name;chip.dataset.present='true';chip.title=mine?'Your visitor':'Find this visitor';
+    chip.setAttribute('aria-label',chip.title);chip.disabled=mine;
+    const portrait=document.createElement('span');portrait.className='portrait-tile guest-tile';
+    portrait.style.setProperty('--visitor-colour',p.color);portrait.innerHTML=icon('walk');
+    chip.append(portrait);chip.addEventListener('click',()=>{world?.findGuest(p.id);host.focus({preventScroll:true});});
+    list.append(chip);guestsOnHud.set(p.id,chip);changed=true;
+  }
+  for(const [id,chip] of guestsOnHud)if(!guests.has(id)){chip.remove();guestsOnHud.delete(id);changed=true;}
+  for(const card of list.querySelectorAll('[data-handle]')){
+    const value=String(online.has(card.dataset.handle));
+    if(card.dataset.present!==value){card.dataset.present=value;changed=true;}
+  }
+  if(changed&&atStart)requestAnimationFrame(()=>{if(inWorld)list.scrollLeft=0;});
 }
-expandRoster(false);
-$('all').addEventListener('click',()=>{const expand=!list.classList.contains('expanded');expandRoster(expand);if(!expand)list.scrollLeft=0;else if(!inWorld)fetchDirectory();});
+function syncRail(){
+  const visible=inWorld&&!hudFolded;
+  prevButton.hidden=nextButton.hidden=!visible;
+  prevButton.disabled=list.scrollLeft<=2;
+  nextButton.disabled=list.scrollLeft+list.clientWidth>=list.scrollWidth-2;
+}
+list.addEventListener('scroll',syncRail,{passive:true});
+new ResizeObserver(syncRail).observe(list);
+list.addEventListener('wheel',e=>{
+  if(!inWorld||e.ctrlKey||Math.abs(e.deltaX)>=Math.abs(e.deltaY))return;
+  list.scrollLeft+=e.deltaY;e.preventDefault();
+},{passive:false});
+for(const [button,sign] of [[prevButton,-1],[nextButton,1]])button.addEventListener('click',()=>list.scrollBy({left:sign*Math.max(110,list.clientWidth*.78),behavior:motion}));
+function expandRoster(expanded) {
+  const button=$('all');
+  if(inWorld){
+    roster.classList.toggle('folded',hudFolded);
+    button.setAttribute('aria-expanded',String(!hudFolded));
+    button.setAttribute('aria-label',hudFolded?'Show residents':'Hide residents');
+    button.title=hudFolded?'Show residents':'Hide residents';
+    button.innerHTML=icon('grid')+'<span>Residents</span>';
+  }else{
+    roster.classList.remove('folded');list.classList.toggle('expanded',expanded);
+    button.setAttribute('aria-expanded',String(expanded));button.removeAttribute('aria-label');button.removeAttribute('title');
+    const label=expanded?'Show less':'View all '+(residents.length+members.size);
+    button.innerHTML=icon(expanded?'row':'grid')+'<span>'+label+'</span>';
+  }
+  syncRail();
+}
+$('all').addEventListener('click',()=>{
+  if(inWorld){hudFolded=!hudFolded;expandRoster(false);return;}
+  const expand=!list.classList.contains('expanded');expandRoster(expand);if(!expand)list.scrollLeft=0;else fetchDirectory();
+});
 renderMembers([]);fetchDirectory();
 function activeNav(which){$('nav-island').classList.toggle('active',which==='island');$('nav-residents').classList.toggle('active',which==='residents');}
 $('nav-residents').addEventListener('click',()=>{expandRoster(true);activeNav('residents');if(!inWorld)fetchDirectory();});
@@ -263,12 +319,19 @@ function nearby(item) {
   b.hidden=item?.type!=='resident'&&item?.type!=='activity';
   if(b.hidden)return;
   b.innerHTML=icon(item.type==='resident'?'chat':'sun');
-  b.append(document.createTextNode(item.type==='resident'?'Meet '+item.resident.shortName:item.id==='swim'?'Take a dip':'Lounge here'));
+  b.append(document.createTextNode(item.type==='resident'?'Meet '+item.resident.shortName:({swim:'Take a dip',lounge:'Lounge here',ride:'Ride motorbike',climb:'Climb palm'})[item.id]));
 }
+const clearStick=bindThumbstick($('thumbstick'),(right,forward)=>world?.setStick(right,forward));
+$('jump').addEventListener('click',()=>{world?.jump();host.focus({preventScroll:true});});
 function updateFocus(){
   updateParty();const focus=getFocus();
   $('focus-panel').hidden=!sitting||!focus;$('world-bottom').hidden=sitting&&Boolean(focus);
-  const label=activity==='swim'?'Back to shore':activity==='lounge'?'Get up':focus?'Return to work':'Take a seat';
+  const exits={swim:'Back to shore',lounge:'Get up',climb:'Climb down',ride:'Park motorbike'};
+  const label=exits[activity]||(focus?'Return to work':'Take a seat');
+  play.dataset.activity=activity||'walk';
+  $('jump').hidden=Boolean(sitting||activity);
+  $('thumbstick').hidden=Boolean(sitting||activity==='lounge');
+  document.querySelector('.move-hint span').textContent=({swim:'Tap water to swim · Drag to look',ride:'W / S to drive · A / D to steer',climb:'Up to climb · Down to descend',lounge:'Resting on the sunbed'})[activity]||'Tap to walk · Drag to look';
   $('seat').innerHTML=icon(activity?'walk':'coffee')+label;
   if(!focus)return;
   $('focus-time').textContent=Math.floor(focus.seconds/60).toString().padStart(2,'0')+':'+(focus.seconds%60).toString().padStart(2,'0');
@@ -294,8 +357,14 @@ function getWorld(){
 }
 async function enterWorld(findHandle=null,claiming=false){
   const ticket=++entryRevision;
+  if(!inWorld){
+    originalScroll=window.scrollY;hudFolded=false;document.body.classList.add('playing');
+    if(navigator.userActivation?.isActive&&document.fullscreenEnabled&&!document.fullscreenElement){
+      document.documentElement.requestFullscreen({navigationUI:'hide'}).then(()=>{if(inWorld)gameFullscreen=true;else if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}).catch(()=>{});
+    }
+  }
   inWorld=true;worldReady=false;pendingFind=findHandle;postcard.hidden=true;play.hidden=false;activeNav('island');
-  restoreSeat=!findHandle&&!claiming&&Boolean(getFocus());room.open();updateParty();
+  restoreSeat=!findHandle&&!claiming&&Boolean(getFocus());room.open();updateParty();expandRoster(false);list.scrollLeft=0;
   window.scrollTo({top:0,behavior:motion});
   if(!world)notice('Opening the courtyard…',30000);
   try{
@@ -317,7 +386,11 @@ async function enterWorld(findHandle=null,claiming=false){
 }
 function leaveWorld(){
   ++entryRevision;inWorld=false;worldReady=false;pendingFind=null;world?.stop();room.close();restoreSeat=false;requestedClaim=null;
-  activity=null;sitting=false;postcard.hidden=false;play.hidden=true;clearTimeout(noticeTimer);fetchDirectory();
+  activity=null;sitting=false;clearStick();postcard.hidden=false;play.hidden=true;clearTimeout(noticeTimer);
+  document.body.classList.remove('playing');
+  if(gameFullscreen&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+  gameFullscreen=false;for(const chip of guestsOnHud.values())chip.remove();guestsOnHud.clear();
+  expandRoster(list.classList.contains('expanded'));window.scrollTo({top:originalScroll,behavior:'instant'});fetchDirectory();
   $('enter').focus({preventScroll:true});
 }
 $('enter').addEventListener('click',()=>enterWorld());
@@ -327,7 +400,7 @@ $('seat').addEventListener('click',()=>{if(activity)world?.stand();else world?.t
 $('interact').addEventListener('click',()=>world?.interact());
 $('find-resident').addEventListener('click',()=>{
   const handle=activeResident.handle;lastTrigger=null;dismiss(profile);
-  enterWorld(handle);
+  if(inWorld)world?.find(handle);else enterWorld(handle);
 });
 $('focus-toggle').addEventListener('click',()=>{toggleFocus();updateFocus();});
 $('stand').addEventListener('click',()=>{endFocus();sitting=false;world?.stand();updateFocus();host.focus({preventScroll:true});});

@@ -1,7 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
 import { residents } from '../src/residents.js';
 import { SEATS, PLAY_SPOTS, npcLandPose } from '../src/island-life.js';
-import { activityId, activitySeat } from '../shared/activities.js';
+import {beachRadius,canSwim,climbPose,climbSpots,JUMP_MS,landRadius,SCOOTER_START,scooterSpot,waterAtCoast,waterEntry} from '../shared/mobility.js';
+import { activityId, activitySeat, climbKey } from '../shared/activities.js';
 import { ballAt, colors, initialBall } from '../shared/ball.js';
 import { acceptsRoomPass, hasInvitation, invitationCookie, invitationPage } from '../shared/invitations.js';
 
@@ -14,7 +15,7 @@ const limit=64;
 const signed=(v)=>Math.round(v*100)/100;
 const finite=(...nums)=>nums.every(Number.isFinite);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
-const publicPlayer=p=>({id:p.id,memberId:p.memberId||null,handle:p.handle,color:p.color,x:p.x,z:p.z,yaw:p.yaw,walking:p.walking,at:p.lastMove,seat:p.seat,waveAt:p.waveAt});
+const publicPlayer=p=>({id:p.id,memberId:p.memberId||null,handle:p.handle,color:p.color,x:p.x,z:p.z,yaw:p.yaw,walking:p.walking,at:p.lastMove,seat:p.seat,waveAt:p.waveAt,jumpAt:p.jumpAt||0,progress:p.progress||0});
 const send=(ws,msg)=>{try{ws.send(JSON.stringify(msg));}catch{}};
 const localHost=url=>['127.0.0.1','localhost','[::1]'].includes(url.hostname);
 export default {
@@ -66,9 +67,14 @@ export class Courtyard extends DurableObject {
     for(const ws of ctx.getWebSockets()){
       const p=ws.deserializeAttachment();if(p?.id)this.peers.set(p.id,{ws,p});
     }
+    this.scooter=JSON.parse(this.sql.exec('SELECT pose FROM toys WHERE id=2').toArray()[0]?.pose||JSON.stringify(SCOOTER_START));
     const now=Date.now();
-    for(const row of this.sql.exec('SELECT id FROM stays WHERE gone IS NULL')){
-      if(!this.peers.has(row.id))this.sql.exec('UPDATE stays SET gone=?,seat=NULL WHERE id=?',now,row.id);
+    for(const row of this.sql.exec('SELECT * FROM stays WHERE gone IS NULL').toArray()){
+      if(!this.peers.has(row.id)){
+        row.memberId=row.member_id;
+        this.dismount(row);
+        this.persist(row,now);
+      }
     }
     this.prune(now);
     this.ball=JSON.parse(this.sql.exec('SELECT pose FROM toys WHERE id=1').toArray()[0]?.pose||JSON.stringify(initialBall));
@@ -97,12 +103,34 @@ export class Courtyard extends DurableObject {
   state(){
     const claims={};
     for(const r of this.sql.exec('SELECT id,handle FROM stays WHERE handle IS NOT NULL'))claims[r.handle]=r.id;
-    return {players:[...this.peers.values()].map(({p})=>publicPlayer(p)),claims,members:this.directory(),ball:this.ball,serverTime:Date.now()};
+    return {players:[...this.peers.values()].map(({p})=>publicPlayer(p)),claims,members:this.directory(),ball:this.ball,scooter:this.scooter,serverTime:Date.now()};
   }
   changed(){this.broadcast({type:'state',...this.state()});}
   remember(p,ws){ws.serializeAttachment(p);}
   persist(p,gone=null){
     this.sql.exec('UPDATE stays SET handle=?,seat=?,x=?,z=?,yaw=?,gone=?,member_id=? WHERE id=?',p.handle,p.seat,p.x,p.z,p.yaw,gone,p.memberId||null,p.id);
+  }
+  playSpot(id,key){
+    if(id==='climb')return climbSpots.find(s=>s.key===key);
+    if(id==='ride')return scooterSpot(this.scooter);
+    return PLAY_SPOTS.find(s=>s.id===id);
+  }
+  dismount(p,exit){
+    const id=activityId(p.seat);
+    if(id==='ride'){
+      this.scooter={x:p.x,z:p.z,yaw:p.yaw};
+      this.sql.exec('INSERT OR REPLACE INTO toys (id,pose) VALUES (2,?)',JSON.stringify(this.scooter));
+      if(exit&&finite(exit.x,exit.z)&&dist(exit,p)<1.1&&(exit.x/10.4)**2+(exit.z/6.7)**2<1.02){
+        p.x=signed(exit.x);p.z=signed(exit.z);
+      }
+    }else if(id==='swim'&&exit&&finite(exit.x,exit.z)&&beachRadius(p.x,p.z)<1.22&&landRadius(exit.x,exit.z)<1.01&&dist(exit,p)<5.3){
+      p.x=signed(exit.x);p.z=signed(exit.z);
+    }else{
+      const spot=this.playSpot(id,climbKey(p.seat)),seat=seatById(p.seat);
+      if(spot)Object.assign(p,spot.land);
+      if(seat)Object.assign(p,{x:signed(seat.x-Math.sin(seat.facing)*.7),z:signed(seat.z-Math.cos(seat.facing)*.7),yaw:seat.facing+Math.PI});
+    }
+    p.seat=null;p.walking=false;p.progress=0;p.jumpAt=0;
   }
   join(ws,ticket,now,memberKey){
     this.prune(now);
@@ -144,13 +172,27 @@ export class Courtyard extends DurableObject {
     const reject=(code,text)=>send(ws,{type:'error',code,text});
     if(msg.type==='ping'){this.remember(p,ws);send(ws,{type:'pong',serverTime:now});return;}
     if(msg.type==='move'){
-      if(p.seat!==null||!finite(msg.x,msg.z,msg.yaw)||now-p.lastMove<45)return;
-      const elapsed=(now-p.lastMove)/1000;
-      if((msg.x/10.6)**2+(msg.z/6.9)**2>1.035||dist(msg,p)>Math.min(23,elapsed*6.1+1.1)){
-        send(ws,{type:'correct',player:publicPlayer(p)});return;
+      if(!finite(msg.x,msg.z,msg.yaw)||now-p.lastMove<45)return;
+      const id=activityId(p.seat),elapsed=(now-p.lastMove)/1000;
+      if(p.seat!==null&&!['swim','ride','climb'].includes(id))return;
+      let pose={x:msg.x,z:msg.z,yaw:msg.yaw},progress=0;
+      if(id==='climb'){
+        const spot=this.playSpot(id,climbKey(p.seat));
+        if(!spot||!Number.isFinite(msg.progress)||msg.progress<0||msg.progress>1||Math.abs(msg.progress-(p.progress||0))>elapsed*.8+.09){
+          send(ws,{type:'correct',player:publicPlayer(p)});return;
+        }
+        progress=msg.progress;pose=climbPose(spot,progress);
+      }else{
+        const valid=id==='swim'?canSwim(msg.x,msg.z):(msg.x/10.6)**2+(msg.z/6.9)**2<1.035;
+        const speed=id==='ride'?8.8:id==='swim'?4.8:6.1;
+        if(!valid||dist(msg,p)>Math.min(23,elapsed*speed+1.1)){send(ws,{type:'correct',player:publicPlayer(p)});return;}
       }
-      Object.assign(p,{x:signed(msg.x),z:signed(msg.z),yaw:signed(Math.atan2(Math.sin(msg.yaw),Math.cos(msg.yaw))),walking:msg.walking===true,lastMove:now});
-      this.remember(p,ws);this.broadcast({type:'move',id:p.id,x:p.x,z:p.z,yaw:p.yaw,walking:p.walking,at:now},ws);return;
+      Object.assign(p,{x:signed(pose.x),z:signed(pose.z),yaw:signed(Math.atan2(Math.sin(pose.yaw),Math.cos(pose.yaw))),progress,walking:msg.walking===true,lastMove:now});
+      this.remember(p,ws);this.broadcast({type:'move',id:p.id,x:p.x,z:p.z,yaw:p.yaw,progress,walking:p.walking,at:now},ws);return;
+    }
+    if(msg.type==='jump'){
+      if(p.seat!==null||now-(p.jumpAt||0)<JUMP_MS+70)return;
+      p.jumpAt=now;this.remember(p,ws);this.broadcast({type:'jump',id:p.id,at:now});return;
     }
     if(msg.type==='saveMember'||msg.type==='removeMember'){
       if(!validMemberKey(msg.key)){reject('member','Reopen the member form and try again.');return;}
@@ -187,6 +229,7 @@ export class Courtyard extends DurableObject {
       const owner=this.sql.exec('SELECT id FROM stays WHERE handle=?',msg.handle).toArray()[0];
       if(owner&&owner.id!==p.id){reject('taken','Someone else is already playing this resident.');send(ws,{type:'state',...this.state()});return;}
       if(p.handle!==msg.handle){
+        this.dismount(p);
         const pose=npcLandPose(handles.indexOf(msg.handle),now);
         Object.assign(p,{handle:msg.handle,seat:null,x:signed(pose.x),z:signed(pose.z),yaw:signed(pose.yaw),walking:false,lastMove:now});
       }
@@ -199,17 +242,17 @@ export class Courtyard extends DurableObject {
       if(owner&&owner.id!==p.id){reject('seat','Someone just sat there. Try another seat.');return;}
       Object.assign(p,{seat:String(seat.id),x:seat.x,z:seat.z,yaw:seat.facing,walking:false});
     }else if(msg.type==='activity'){
-      const spot=PLAY_SPOTS.find(s=>s.id===msg.id);
-      if(!spot||p.seat!==null||dist(p,spot.land)>2.8){reject('activity','Walk up to the activity first.');return;}
-      const seat=activitySeat(spot.id,p.id);
-      if(this.sql.exec('SELECT id FROM stays WHERE seat=? AND id<>?',seat,p.id).toArray().length){reject('activity','The sunbed is occupied. Try a swim instead.');return;}
-      Object.assign(p,spot.land,{seat,walking:false,lastMove:now});
+      const spot=this.playSpot(msg.id,msg.key);
+      const coastline=spot?.id==='swim'&&msg.shore===true&&landRadius(p.x,p.z)>.90;
+      if(!spot||p.seat!==null||(!coastline&&dist(p,spot.land)>2.8)){reject('activity','Walk up to the activity first.');return;}
+      const seat=activitySeat(spot.id,p.id,spot.key);
+      if(this.sql.exec('SELECT id FROM stays WHERE seat=? AND id<>?',seat,p.id).toArray().length){
+        reject('activity',spot.id==='ride'?'Someone is riding the motorbike.':spot.id==='climb'?'Someone is on this palm. Try another tree.':'The sunbed is occupied.');return;
+      }
+      const origin=coastline?waterAtCoast(p.x,p.z):spot.id==='swim'?waterEntry(p.id):spot.id==='climb'?climbPose(spot,0):spot.land;
+      Object.assign(p,{x:origin.x,z:origin.z,yaw:origin.yaw,seat,progress:0,jumpAt:0,walking:false,lastMove:now});
     }else if(msg.type==='stand'){
-      const seat=seatById(p.seat);
-      const spot=PLAY_SPOTS.find(s=>s.id===activityId(p.seat));
-      if(spot)Object.assign(p,spot.land);
-      if(seat)Object.assign(p,{x:signed(seat.x-Math.sin(seat.facing)*.7),z:signed(seat.z-Math.cos(seat.facing)*.7),yaw:seat.facing+Math.PI});
-      p.seat=null;p.lastMove=now;
+      this.dismount(p,msg.exit);p.lastMove=now;
     }else if(msg.type==='wave'){
       if(now-p.waveAt<1100)return;
       p.waveAt=now;this.remember(p,ws);this.broadcast({type:'wave',id:p.id,at:now});return;
@@ -231,7 +274,7 @@ export class Courtyard extends DurableObject {
   }
   leave(ws){
     const p=ws.deserializeAttachment();if(!p?.id||this.peers.get(p.id)?.ws!==ws)return;
-    p.seat=null;p.walking=false;this.persist(p,Date.now());
+    this.dismount(p);this.persist(p,Date.now());
     this.peers.delete(p.id);this.changed();
   }
   webSocketClose(ws,code,reason){this.leave(ws);try{ws.close([1005,1006,1015].includes(code)?1000:code,reason);}catch{}}

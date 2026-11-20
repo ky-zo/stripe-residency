@@ -42,7 +42,7 @@
           <div class="postcard-location"><i data-icon="pin"></i>Bali, Indonesia</div>
         </div>
         <div id="play-space" class="play-space" hidden>
-          <div id="world-host" class="world-host" tabindex="0" aria-label="Walkable three-dimensional courtyard. Tap the ground to walk and drag to look around. You can also use the arrow keys or W A S D to walk and E to interact."></div>
+          <div id="world-host" class="world-host" tabindex="0" aria-label="Walkable three-dimensional courtyard. Tap the ground to walk and drag to look around. Use WASD or arrow keys to move, Space to jump, Q to wave and E to interact."></div>
           <div class="world-top">
             <button class="world-control" id="leave" type="button"><i data-icon="island"></i><span>Island home</span></button>
             <div class="world-actions">
@@ -50,6 +50,8 @@
               <button class="world-control" type="button" id="help" aria-label="How to explore" title="How to explore"><i data-icon="help"></i></button>
             </div>
           </div>
+          <button class="thumbstick" id="thumbstick" type="button" tabindex="-1" aria-label="Movement joystick"><span></span></button>
+          <button class="jump-control" id="jump" type="button" aria-label="Jump" title="Jump (Space)"><i data-icon="jump"></i><span>Jump</span></button>
           <div id="world-label" class="world-label" hidden></div>
           <div id="visitor-label" class="visitor-label" hidden>You</div>
           <div id="world-bottom" class="world-bottom">
@@ -69,6 +71,8 @@
           <div class="section-titles"><i class="roster-flower" data-icon="flower"></i><h2 id="roster-title">The residents</h2></div>
           <button class="roster-toggle" type="button" id="all" aria-controls="resident-list" aria-expanded="false"><i data-icon="grid"></i><span>View all residents</span></button>
         </div>
+        <button type="button" class="hud-scroll hud-prev" aria-label="Previous residents" hidden><i data-icon="chevron"></i></button>
+        <button type="button" class="hud-scroll hud-next" aria-label="More residents" hidden><i data-icon="chevron"></i></button>
         <div id="resident-list" class="resident-list" aria-label="Resident portraits"></div>
       </section>
     </main>
@@ -115,13 +119,14 @@
       <button class="round-btn modal-close" aria-label="Close controls" id="close-help" type="button"><i data-icon="close"></i></button>
       <h2 id="help-title">Around the island</h2>
       <div id="activity-list" class="activity-list">
-        <button type="button" data-activity="swim"><i data-icon="island"></i>Take a swim</button>
+        <button type="button" data-activity="swim"><i data-icon="swim"></i>Take a swim</button>
+        <button type="button" data-activity="climb"><i data-icon="island"></i>Climb a palm tree</button>
+        <button type="button" data-activity="ride"><i data-icon="motorbike"></i>Ride the motorbike</button>
         <button type="button" data-activity="lounge"><i data-icon="sun"></i>Lounge on the sunbed</button>
         <button type="button" data-activity="desk"><i data-icon="coffee"></i>Work at a table</button>
       </div>
-      <p>Tap a patch of ground to walk there, or use <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or the arrow keys. Drag the scene to look around.</p>
-      <p>Tap a resident to meet them, or press <kbd>E</kbd> nearby. Choose a resident or join as yourself. Friends on your invite link share this island.</p>
-      <p>Press <kbd>Space</kbd> to wave. Tap the beach float to take a dip, a sunbed to lounge, or a worktable to start a 25-minute focus session.</p>
+      <p>Tap a destination or use the joystick, arrow keys or <kbd>WASD</kbd> to move. Drag to look around. Walk into the sea to swim. On a bike, push forward to accelerate and left or right to steer. On a palm, push up or down.</p>
+      <p><kbd>Space</kbd> jumps, <kbd>Q</kbd> waves and <kbd>E</kbd> interacts. Tap any portrait above the island to meet that resident.</p>
     </dialog>
     <script type="module" src="/src/main.js"></script>
   </body>

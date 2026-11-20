@@ -1,3 +1,4 @@
+import {SWIM_LEVEL,waterEntry} from '../shared/mobility.js';
 const TAU = Math.PI * 2;
 const clamp = (n, low = 0, high = 1) => Math.min(high, Math.max(low, n));
 function smooth(t) {
@@ -30,7 +31,7 @@ export const SEATS = [
 ];
 
 export const SWIMMER_INDEX = 4;
-export const WATER_Y = -.64;
+export const WATER_Y = SWIM_LEVEL;
 export const SWIM_LANDING = {x:2.05,z:-5.85,yaw:Math.PI};
 
 const sunDeck = {x:-3.92,z:4.12,facing:1.16};
@@ -190,21 +191,15 @@ function swimPose(seconds, offset, cx, cz, rx, rz, period, land) {
   return {x,z,y,yaw:Math.atan2(rx*Math.cos(phase),-rz*Math.sin(phase)),walking:false,seated:false,activity:'swim',land};
 }
 
-/** Shared-clock figure pose while a player is using a leisure spot. */
-export function playPose(id, serverTimeMs, playerId='guest') {
+/** Only the water bob uses the room clock. Players supply their own swimming position. */
+export function playPose(id, serverTimeMs, playerId='guest',position=null) {
   if(id==='lounge') {
     const bed=SUNBEDS[2];
     return {x:bed.x,z:bed.z,y:0,yaw:bed.facing,walking:false,seated:true,activity:'lounge',land:PLAY_SPOTS[0].land};
   }
   if(id!=='swim')return null;
-  let hash=2166136261;
-  const name=String(playerId);
-  for(let i=0;i<name.length;i++) hash=Math.imul(hash^name.charCodeAt(i),16777619);
-  hash=Math.imul(hash^hash>>>16,0x85ebca6b);
-  hash=(hash^hash>>>13)>>>0;
-  const phase=TAU*hash/4294967296, lane=hash%4;
-  const seconds=Number.isFinite(serverTimeMs)?serverTimeMs/1000:0;
-  return swimPose(seconds,phase,2.65+.025*lane,-10.65-.30*lane,1.09,.22,17.6+lane*.9,PLAY_SPOTS[1].land);
+  const p=position&&Math.hypot(position.x/11.7,position.z/8.15)>.9?position:waterEntry(playerId);
+  return {x:p.x,z:p.z,y:WATER_Y+.024*Math.sin(serverTimeMs*.0029),yaw:p.yaw,walking:Boolean(p.walking),activity:'swim',land:PLAY_SPOTS[1].land};
 }
 
 /** An eight-panel vinyl beach ball. Its object origin is the centre of the ball. */

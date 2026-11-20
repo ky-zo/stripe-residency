@@ -740,7 +740,7 @@ function buildPieces(studio,look,expression) {
 }
 
 const guestHair={short:'swept',wavy:'parted',long:'layered',buzz:'shaved'};
-const activities=new Set(['lounge','swim','read','work','stretch','photograph']);
+const activities=new Set(['lounge','swim','read','work','stretch','photograph','climb','ride','jump']);
 const swatch=(value,fallback)=>typeof value==='string'&&/^#[\da-f]{6}$/i.test(value)?value.toLowerCase():fallback;
 
 function customPieces(studio,library,look,expression) {
@@ -861,6 +861,7 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
   });
   const hash=Array.from(id).reduce((sum,c)=>sum+c.charCodeAt(0)*.149,0);
   const aim=new T.Vector3(),rotation=new T.Quaternion();
+  const wrist=new T.Vector3(),poseInverse=new T.Quaternion();
   const signature=keepsakePoses[look.prop];
   const contextProps=new Map();
   let palm=null,lastActivity='';
@@ -868,6 +869,16 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
     aim.set(x-limb.arm.position.x,y-limb.arm.position.y,z-limb.arm.position.z).normalize();
     rotation.setFromUnitVectors(limb.armDirection,aim);
     limb.arm.quaternion.slerp(rotation,weight);
+  }
+  // A grip is anchored to the vehicle or the bark while the body moves behind it.
+  // Only the shoulder-to-palm distance changes. The hand retains its round width.
+  function grip(limb,x,y,z) {
+    aim.set(x,y,z).sub(pose.position).applyQuaternion(poseInverse).sub(limb.arm.position);
+    const arm=limb.arm;
+    const lengthY=Math.sqrt(Math.max(0,aim.lengthSq()-.073**2-.089**2));
+    arm.scale.y=T.MathUtils.clamp(lengthY/.260,.80,1.62);
+    wrist.set(limb.side*.073,-.260*arm.scale.y,.089).normalize();
+    arm.quaternion.setFromUnitVectors(wrist,aim.normalize());
   }
   function changeActivity(activity) {
     if(activity===lastActivity) return;
@@ -891,26 +902,41 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
     item.rotation.set(reading?.91:-.09,reading?Math.PI:0,reading?0:-.05);
     item.scale.setScalar(reading?1.42:1.22);
   }
-  let walkWeight=0,seatWeight=0,previousTime;
+  let walkWeight=0,seatWeight=0,previousTime,jumpStart=0;
+  let travelPhase=hash%2<1?.85:Math.PI+.85;
   function animate(time=0,walking=false,seated=false,wave=0,activity='') {
     activity=activities.has(activity)?activity:'';
+    if(activity==='jump'&&lastActivity!=='jump') jumpStart=time;
     changeActivity(activity);
-    const sitting=seated||activity==='read'||activity==='work'||activity==='lounge';
+    const climbing=activity==='climb',riding=activity==='ride',jumping=activity==='jump';
+    const traveling=climbing||riding;
+    const sitting=(seated&&!traveling&&!jumping)||activity==='read'||activity==='work'||activity==='lounge';
     const delta=previousTime===undefined?1:Math.max(0,Math.min(.16,time-previousTime));
     previousTime=time;
     const ease=1-Math.exp(-delta*15);
-    const targetWalk=sitting?0:Math.min(1,Math.max(0,Number(walking)||0));
+    const movement=T.MathUtils.clamp(Number(walking)||0,-1,1);
+    const targetWalk=sitting?0:traveling?Math.abs(movement):Math.max(0,movement);
     walkWeight+=(targetWalk-walkWeight)*ease;
     seatWeight+=(Number(Boolean(sitting))-seatWeight)*ease;
+    if(traveling&&movement) {
+      travelPhase=(travelPhase+delta*(climbing?4.5:7.3)*walkWeight*Math.sign(movement))%tau;
+    }
     const greeting=Math.max(0,Math.min(1,Number(wave)||0));
     const shake=Math.sin(time*14+hash);
     const reach=Math.cos(time*6.4+hash);
     const step=Math.sin(time*8.8+hash),breath=Math.sin(time*2+hash);
+    const stridePhase=traveling?Math.sin(travelPhase):0;
+    const airborne=jumping?T.MathUtils.clamp((time-jumpStart)/.72,0,1):0;
+    const tuck=jumping?Math.sin(airborne*Math.PI):0;
+    const pushOff=jumping?Math.max(0,1-airborne/.18):0;
+    const landing=jumping?Math.max(0,1-Math.abs(airborne-.88)/.12):0;
+    pose.position.x=0;
     pose.position.y=.004*(1+breath)+Math.abs(step)*.032*walkWeight-.015*seatWeight;
     pose.position.z=0;
     pose.rotation.x=.045*walkWeight+.041*seatWeight;
     pose.rotation.y=0;
     pose.rotation.z=step*.024*walkWeight+.044*greeting;
+    head.position.z=0;
     head.rotation.y=Math.sin(time*.69+hash)*(.041+.038*walkWeight);
     head.rotation.x=.013*breath+.096*seatWeight;
     head.rotation.z=expression[4]*1.32+.011*Math.sin(time*.82+hash)-(.095+.018*shake)*greeting;
@@ -936,17 +962,40 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
     } else if(activity==='photograph') {
       head.rotation.x=.103+.045*Math.sin(time*1.4+hash);
       head.rotation.z-=.07;
+    } else if(climbing) {
+      pose.position.set(.024*stridePhase,.031+.012*walkWeight*Math.cos(2*travelPhase),.027);
+      pose.rotation.set(-.058,.038*stridePhase,-.052*stridePhase);
+      head.position.z=-.086;
+      head.rotation.x=-.29+.040*Math.cos(travelPhase);
+      head.rotation.y=.12*stridePhase;
+    } else if(riding) {
+      // Keep the hips over a 0.64-high saddle through the forward lean.
+      const lean=.070+.050*walkWeight;
+      pose.position.set(0,.640-.407*Math.cos(lean)+.004*walkWeight*Math.cos(2*travelPhase),-.407*Math.sin(lean));
+      pose.rotation.set(lean,0,.017*stridePhase*walkWeight);
+      head.rotation.x=-lean*.72+.013*breath;
+      head.rotation.z-=pose.rotation.z*.65;
+    } else if(jumping) {
+      // The world owns the height of the jump. The rig anticipates, tucks, then braces.
+      pose.position.y=.004-.017*pushOff-.042*landing;
+      pose.rotation.set(-.088*tuck+.070*pushOff+.095*landing,0,.052*tuck);
+      head.rotation.x=-.17*tuck+.045*pushOff+.087*landing;
+      head.rotation.z-=.058*tuck;
     }
+    if(traveling) poseInverse.copy(pose.quaternion).invert();
     const blink=(time+hash)%(4.2+(hash%1.5));
     const resting=activity==='lounge';
-    eyes.geometry=resting?pieces.sleep:greeting>.71?pieces.happy:pieces.eyes;
-    eyes.scale.y=(resting||greeting>.71)?1:blink<.17?.11+.89*Math.min(1,Math.abs(blink-.085)/.065):1;
+    const delighted=greeting>.71||(jumping&&airborne>.25&&airborne<.74);
+    eyes.geometry=resting?pieces.sleep:delighted?pieces.happy:pieces.eyes;
+    eyes.scale.y=(resting||delighted)?1:blink<.17?.11+.89*Math.min(1,Math.abs(blink-.085)/.065):1;
     for(const limb of limbs) {
       const {arm,thigh,shin,side}=limb;
       const stride=step*side;
       thigh.rotation.x=-stride*.48*walkWeight-1.30*seatWeight;
       thigh.rotation.z=0;
       shin.rotation.x=Math.max(0,stride)*.42*walkWeight+1.30*seatWeight;
+      shin.rotation.z=0;
+      shin.scale.y=1;
       arm.rotation.x=stride*.39*walkWeight-.043+.021*breath-.94*seatWeight;
       arm.rotation.y=0;
       arm.rotation.z=side*(.06+.037*walkWeight+.061*seatWeight);
@@ -975,6 +1024,28 @@ export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
         thigh.rotation.x=kick*.25;shin.rotation.x=.15+Math.max(0,-kick)*.38;
         const recovery=Math.max(0,Math.cos(time*2.2+hash+side*1.07));
         aimHand(limb,side*(.33+.18*(1+stroke)/2),.89+.24*stroke,.065-.23*recovery);
+      } else if(climbing) {
+        const high=side*stridePhase;
+        const release=Math.max(0,side*Math.cos(travelPhase))*walkWeight;
+        // Opposite knee and hand rise together. The lifted hand clears the bark to regrip.
+        grip(limb,side*(.140+.032*release),.938+.120*high,.303-.043*release);
+        thigh.rotation.x=-.96+.39*high;
+        thigh.rotation.z=side*(.22+.035*release);
+        shin.rotation.x=.86-.40*high;
+        shin.rotation.z=-side*.12;
+      } else if(riding) {
+        grip(limb,side*.29,.925,.400);
+        thigh.rotation.x=-1.00+.018*stridePhase*side*walkWeight;
+        thigh.rotation.z=side*.18;
+        shin.rotation.x=.83-.027*stridePhase*side*walkWeight;
+        shin.rotation.z=-side*.13;
+        shin.scale.y=1.23;
+      } else if(jumping) {
+        thigh.rotation.x=-(side>0?1.18:.36)*tuck-.33*pushOff-.59*landing;
+        thigh.rotation.z=side*(.07+.19*tuck);
+        shin.rotation.x=(side>0?1.66:1.29)*tuck+.56*pushOff+.85*landing;
+        arm.rotation.x=-.17-(.45+.13*side)*tuck+.31*pushOff+.20*landing;
+        arm.rotation.z=side*(.26+(1.50+.27*side)*tuck+.24*landing);
       }
       if(side<0 && greeting>0) {
         // Trace a broad arc around the shoulder while keeping the open palm raised.

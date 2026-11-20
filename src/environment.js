@@ -1,5 +1,6 @@
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { onMat, SEATS, WATER_Y, WORK_DESKS, WORK_MATS } from './island-life.js';
+import { PALMS, palmTrunk, shoreline } from '../shared/mobility.js';
 import { addShoreActivities } from './shore-art.js';
 
 const TAU = Math.PI * 2;
@@ -142,11 +143,6 @@ function makeContactShadows(T) {
     parent.add(mesh);
   }
   return { ellipse, finish };
-}
-
-function shoreline(angle) {
-  const inlet=.136*Math.exp(-Math.pow((angle+1.315)/.26,2));
-  return 1 + 0.033 * Math.sin(3 * angle - 0.45) + 0.016 * Math.sin(6 * angle + 1) + 0.012 * Math.sin(9 * angle) - inlet;
 }
 
 function makeWater(T, root) {
@@ -495,9 +491,10 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
     shadows.ellipse(x,z,.76,.62,.23);
   }
 
-  function palm(x, z, height, reach, leanX, leanZ) {
+  function palm(tree) {
+    const {x,z,height,reach}=tree;
     const levels = 12;
-    const trunk = t => [x + leanX * (0.22*t + 0.78*t*t), height*t, z + leanZ * (0.22*t + 0.78*t*t)];
+    const trunk = t => { const p=palmTrunk(tree,t);return [p.x,p.y,p.z]; };
     const bark = ['#a1764e','#b18a59','#bd9261','#aa8054'];
     for (let j = 0; j < levels; j++) {
       const t = j/levels, end = (j+1)/levels;
@@ -913,11 +910,7 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
   }
   parasol(4.98,-4.44,2.64,1.48);
 
-  palm(-9.68,.57,4.42,2.43,-.57,.05);
-  palm(-7.5,-5.76,4.83,2.43,-.40,-.13);
-  palm(-.65,-6.45,4.43,2.32,.66,.03);
-  palm(8.50,-3.87,4.70,2.46,.74,-.16);
-  palm(9.99,2.07,3.66,2.03,.45,.23);
+  PALMS.forEach(palm);
 
   // Compact gardens around the perimeter keep sight lines open in the middle.
   const beds=[
