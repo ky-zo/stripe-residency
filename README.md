@@ -18,12 +18,12 @@ Use Node 22.12 or later. Run `npm ci`, then `npm run dev`. The development comma
 
 The Cloudflare Worker serves the website and upgrades `/live` to a WebSocket. All connections route to one named Durable Object. It keeps players, guest details and character claims in memory for active connections. The shared beach ball and parked motorbike use the toys table. The canoe crew, padel rally and court record last for the active room. The room shares swimmer and rider positions, climbing progress and jump timing. Multiple players can swim together. Each climbable palm, work seat, the spare sunbed and the motorbike have one occupant at a time.
 
-Disconnecting releases the player's character and seat. An open tab can reintroduce its guest during a network interruption using its current page memory. Select Invite to copy the shared link. Everyone who has the invitation can join.
+Disconnecting releases the player's character and seat. An open tab can reintroduce its guest during a network interruption using its current page memory. Select Invite to copy the island link. Anyone with the link can join.
 
 ## Production
 
-`npm run build` creates the Vercel website and a ZIP of all 21 GLB figures in `build/island`. The production project is `kyzobuilds/palm-hours`. Vercel serves the site and protects the residency invitation. Its middleware gives an invited browser a one-minute, origin-bound pass to open a WebSocket directly to the Cloudflare room. This also works in browsers that block third-party cookies.
+`npm run build` creates the Vercel website and a ZIP of all 21 GLB figures in `build/island`. The production project is `kyzobuilds/palm-hours`. Vercel serves the public site at [stripe.house](https://stripe.house). Its middleware gives each browser a one-minute, origin-bound pass to open a WebSocket directly to the Cloudflare room. Old `/join/…` invitation links redirect to the front page. This also works in browsers that block third-party cookies.
 
-Production uses the same `ISLAND_INVITE` and `ROOM_SIGNING_KEY` secrets on Vercel and Cloudflare. The invitation path is `/join/<ISLAND_INVITE>`. `wrangler.jsonc` configures the room. The private Sites entry opens the shared invitation through `COURTYARD_INVITATION_URL`.
+Production uses the same `ISLAND_INVITE` and `ROOM_SIGNING_KEY` secrets on Vercel and Cloudflare. Vercel uses `ISLAND_INVITE` only to read the member directory from the room. `wrangler.jsonc` configures the room. The private Sites entry opens the shared invitation through `COURTYARD_INVITATION_URL`.
 
 `src/residents.js` contains the profile sources and keepsakes. The GPT ImageGen clay portraits live in `public/portraits`. Their original and revised prompts are in `art-direction.json`. Each playable resident has sculpted hair, bead eyes, a pressed-clay smile and a personal keepsake. The gallery, GLB download and island share the same figure. On the island, the eyes change expression when a resident waves or rests on a sunbed. The Stripe wordmark comes from the [Stripe newsroom](https://stripe.com/newsroom/information).

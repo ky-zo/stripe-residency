@@ -61,14 +61,8 @@ function finishEntry(){
   if(requestedClaim){const h=requestedClaim;requestedClaim=null;room.trigger('claim',{handle:h});}
   else if(pendingFind){const h=pendingFind;pendingFind=null;world.find(h);}
 }
-let invitationUrl=location.pathname.startsWith('/join/')?location.origin+location.pathname:null;
 async function copyInvite(){
-  if(!invitationUrl){
-    const response=await fetch('/api/invite',{cache:'no-store'});
-    if(!response.ok)throw new Error('Invitation unavailable');
-    const data=await response.json();invitationUrl=new URL(data.path,location.href).href;
-  }
-  const url=invitationUrl;
+  const url=location.origin+'/';
   try{await navigator.clipboard.writeText(url);return {url,copied:true};}catch{return {url,copied:false};}
 }
 party=createPartyUI({residents,onClaim:handle=>room.trigger('claim',{handle}),onRelease:()=>room.trigger('release'),onWave:()=>room.trigger('wave'),
