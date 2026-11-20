@@ -23,7 +23,11 @@ export default async function middleware(request) {
     return rewrite(new URL('/stripe-residency-figures.zip',url),{headers:privateHeaders});
   }
   if (url.pathname === '/api/members') {
-    return fetch('https://' + roomHost + '/api/members', {headers:{Cookie:'__Host-palm_hours='+invitation},cache:'no-store'});
+    const directory=await fetch('https://' + roomHost + '/api/members',{
+      headers:{Cookie:'__Host-palm_hours='+invitation,'Accept-Encoding':'identity'},cache:'no-store'
+    });
+    if(!directory.ok)return new Response(null,{status:directory.status,headers:privateHeaders});
+    return Response.json(await directory.json(),{headers:privateHeaders});
   }
   if (url.pathname === '/api/connection') {
     if (!process.env.ROOM_SIGNING_KEY) return new Response('Island is opening.', {status:503,headers:privateHeaders});

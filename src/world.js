@@ -98,7 +98,7 @@ export function createWorld(host,residents,callbacks) {
     const narrow=camera.aspect<.95;
     const follow=wide?.04:(narrow?.88:.68);
     const trackSwim=doing==='swim'&&!wide;
-    desired.set(p.x*(trackSwim?.93:follow),wide?1.0:trackSwim?.12:.79,p.z*(trackSwim?.99:follow)+(trackSwim?1.35:wide?-.62:-.65));
+    desired.set(p.x*(trackSwim?.98:follow),wide?1.0:trackSwim?-.20:.79,p.z*(trackSwim?.99:follow)+(trackSwim?.55:wide?-.62:-.65));
     const smoothing=snap || reduced?1:1-Math.exp(-dt*3.7);
     cameraFocus.lerp(desired,smoothing);
     const horizontalRadius=wide?Math.max(15.8,12.6/camera.aspect):trackSwim?(narrow?6.3:8.6):narrow?8.6:12.15;
@@ -283,8 +283,9 @@ export function createWorld(host,residents,callbacks) {
       const oldSeat=seated,oldActivity=doing;seated=seat;doing=activityId(next.seat);ring.visible=!seat&&!doing;
       if(doing==='swim'&&oldActivity!=='swim'){
         shoreView={angle,tilt,wide};angle=Math.PI-.31;tilt=.39;wide=false;introView=false;callbacks.onCamera(false);
+        snap(playPose('swim',room.now(),next.id));setCamera(0,true);
       }else if(doing!=='swim'&&shoreView){
-        ({angle,tilt,wide}=shoreView);shoreView=null;callbacks.onCamera(wide);
+        ({angle,tilt,wide}=shoreView);shoreView=null;callbacks.onCamera(wide);setCamera(0,true);
       }
       if(seat&&!oldSeat)callbacks.onSit(seat);
       else if(!seat&&oldSeat)callbacks.onLeaveSeat();
