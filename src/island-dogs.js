@@ -2,8 +2,9 @@ import { clayStudio } from './clay-mesh.js';
 
 const libraries = new WeakMap();
 const tau = Math.PI * 2;
-const chestnut = '#97573b', cocoa = '#705044', darkCocoa = '#503932';
-const caramel = '#c18a62', espresso = '#302729';
+// Both puppies share Poopi's apricot coat.
+const apricot = '#c38a66', deepApricot = '#ad7352';
+const lightApricot = '#dcab88', espresso = '#302729';
 
 function smooth(a, b, value) {
   const t = Math.max(0, Math.min(1, (value - a) / (b - a)));
@@ -66,7 +67,7 @@ function spot(T, part, radii, head, direction, width, height, phase) {
       faces.push(b, a + sides, b + sides);
     }
   }
-  part.surface(darkCocoa, vertices, faces, null, normals);
+  part.surface(deepApricot, vertices, faces, null, normals);
 }
 
 // A few overlapping, rounded locks follow the grain of the coat. Their roots tuck under the clay.
@@ -100,22 +101,22 @@ function fur(T, part, radii, corgi, head) {
     }
     part.surface(color,verts,faces,null,norms);
   }
-  const warm = corgi ? '#9d5b3e' : '#755347', soft = corgi ? '#a46142' : '#7b5749';
+  const warm = '#c7906c', soft = '#cd9874';
   if (head) {
     lock(soft, [[-.32,.78,.58],[-.27,.90,.37],[-.09,1,.18],[.15,1,.08]], .032,.018);
     lock(warm, [[-.01,.80,.58],[.08,.94,.33],[.22,1,.11],[.33,.90,-.14]], .029,.010);
-    if (!corgi) lock('#755347', [[-.63,.76,.33],[-.49,.92,.20],[-.28,.97,.10],[-.18,.97,-.14]], .026,.011);
+    if (!corgi) lock(warm, [[-.63,.76,.33],[-.49,.92,.20],[-.28,.97,.10],[-.18,.97,-.14]], .026,.011);
     for (const side of [-1, 1]) {
-      const color = !corgi && side < 0 ? '#5a4037' : warm;
+      const color = !corgi && side < 0 ? '#b27a57' : warm;
       lock(color, [[.76,.16,.62],[.89,.08,.45],[.99,-.11,.25],[.99,-.31,.05]], .025,.011,side);
-      if (corgi) lock('#a26041', [[.77,-.16,.61],[.90,-.25,.43],[.98,-.39,.23],[.90,-.52,.08]], .024,.010,side);
+      if (corgi) lock(warm, [[.77,-.16,.61],[.90,-.25,.43],[.98,-.39,.23],[.90,-.52,.08]], .024,.010,side);
     }
   } else {
     for (const side of [-1,1]) {
-      const shoulder = !corgi && side < 0 ? '#564036' : warm;
+      const shoulder = !corgi && side < 0 ? '#b27a57' : warm;
       lock(shoulder, [[.69,.51,.52],[.79,.47,.41],[.89,.32,.28],[.95,.20,.23]], .030,.012,side);
       lock(shoulder, [[.82,.12,.54],[.90,.20,.42],[.95,.12,.33],[.97,.05,.25]], .028,.010,side);
-      const rump = !corgi && side > 0 ? '#593e36' : warm;
+      const rump = !corgi && side > 0 ? '#b27a57' : warm;
       lock(rump, [[.66,.56,-.50],[.77,.43,-.55],[.80,.27,-.61],[.72,.05,-.72]], .027,.011,side);
     }
   }
@@ -123,8 +124,8 @@ function fur(T, part, radii, corgi, head) {
 
 // Paint follows the curved coat, including the far side of each figure.
 function coat(T, part, radii, corgi, head) {
-  const base = new T.Color(corgi ? chestnut : cocoa), shade = new T.Color(corgi ? '#794630' : darkCocoa);
-  const light = new T.Color(caramel), color = new T.Color();
+  const base = new T.Color(apricot), shade = new T.Color(deepApricot);
+  const light = new T.Color(lightApricot), color = new T.Color();
   const points = [], normals = [], tints = [], faces = [];
   const sides = head && corgi ? 48 : 36, rings = head && corgi ? 29 : 21;
   const [rx, ry, rz] = radii;
@@ -166,15 +167,16 @@ function coat(T, part, radii, corgi, head) {
   fur(T, part, radii, corgi, head);
 }
 
+// Small, rounded ears: the top follows a half ellipse instead of rising to a point.
 function corgiEar(part, side) {
   const rows = [
-    [-.035, .062, .037, -.006, 0], [-.015, .077, .043, -.003, 0],
-    [.015, .078, .043, .004, 0], [.055, .066, .037, .016, -.005],
-    [.094, .051, .027, .030, -.010], [.133, .031, .019, .046, -.014],
-    [.157, .015, .011, .053, -.011], [.166, .003, .004, .051, -.008]
+    [-.030, .050, .028, -.004, 0], [-.010, .056, .031, -.002, 0],
+    [.015, .058, .032, .002, -.001], [.040, .054, .030, .007, -.003],
+    [.060, .043, .025, .012, -.005], [.074, .029, .018, .016, -.006],
+    [.081, .016, .011, .018, -.006], [.084, .004, .004, .018, -.006]
   ];
-  part.loft(chestnut, rows.map(([y, x, z, cx, cz]) => [y, x, z, side * cx, cz]), 20);
-  const vertices = [], faces = [], widths = [.10, .63, .70, .65, .46, .10];
+  part.loft(apricot, rows.map(([y, x, z, cx, cz]) => [y, x, z, side * cx, cz]), 20);
+  const vertices = [], faces = [], widths = [.26, .60, .66, .63, .52, .28];
   const inset = rows.slice(1, 7), cols = 8;
   inset.forEach(([y, rx, rz, cx, cz], i) => {
     for (let j = 0; j <= cols; j++) {
@@ -190,7 +192,7 @@ function corgiEar(part, side) {
 }
 
 function floppyEar(part, side) {
-  const color = side < 0 ? darkCocoa : '#78513f';
+  const color = side < 0 ? deepApricot : '#ba8360';
   const rows = [
     [-.187,.013,.022,side*.050,.044],[-.179,.029,.046,side*.058,.041],
     [-.153,.042,.069,side*.064,.038],[-.114,.049,.076,side*.063,.026],
@@ -225,20 +227,20 @@ function floppyEar(part, side) {
 function muzzle(part, corgi) {
   const front = corgi ? .151 : .141;
   if (corgi) {
-    part.oval('#755047', 0, -.071, front + .014, .048, .024, .027);
+    part.oval('#956053', 0, -.071, front + .014, .048, .024, .027);
     part.dot('#df8b82', .009, -.084, front + .026, .022, .017, .018);
   }
   for (const side of [-1, 1]) {
-    part.oval(corgi ? '#c18a61' : '#ad7e60', side * .034, -.042, front, .063, .049, .062, [0, side * .11, side * .07]);
+    part.oval('#d39a75', side * .034, -.042, front, .063, .049, .062, [0, side * .11, side * .07]);
     for (const [x, y, z] of [[.042,-.049,.059],[.063,-.047,.054],[.052,-.061,.053]]) {
-      part.dot('#78513b', side * x, y, front + z, .0038, .0036, .003);
+      part.dot('#976447', side * x, y, front + z, .0038, .0036, .003);
     }
     if (!corgi) {
       const smile = [[0,-.055],[.013,-.065],[.032,-.068],[.054,-.057]].map(([x,y]) => {
         const depth = .062 * Math.sqrt(Math.max(0, 1 - ((x-.034)/.063)**2 - ((y+.042)/.049)**2));
         return [side*x, y, front + depth + .002];
       });
-      part.stroke('#76584c', smile, .0031, .24, 8, 5);
+      part.stroke('#8d5c47', smile, .0031, .24, 8, 5);
     }
   }
   part.loft(espresso, [
@@ -263,7 +265,7 @@ function tail(T, part, corgi) {
   const curve = new T.CatmullRomCurve3(points.map(p => new T.Vector3(...p)));
   const rings = 15, sides = 14, frames = curve.computeFrenetFrames(rings, false);
   const verts = [], normals = [], colors = [], faces = [];
-  const start = new T.Color(corgi ? chestnut : darkCocoa), tip = new T.Color(corgi ? caramel : '#a17458'), col = new T.Color();
+  const start = new T.Color(corgi ? apricot : deepApricot), tip = new T.Color(lightApricot), col = new T.Color();
   const delta = new T.Vector3();
   for (let i = 0; i <= rings; i++) {
     const t = i / rings, center = curve.getPointAt(t);
@@ -286,16 +288,16 @@ function tail(T, part, corgi) {
 }
 
 function paw(part, corgi, side, rear) {
-  const hip = corgi ? .147 : .165, color = corgi ? chestnut : rear && side > 0 ? darkCocoa : cocoa;
+  const hip = corgi ? .147 : .165, color = !corgi && rear && side > 0 ? deepApricot : apricot;
   part.oval(color, 0, -.024, -.004, corgi ? .056 : .043, .088, rear ? .072 : .052, [rear ? -.18 : .04, 0, 0]);
   const foot = corgi ? .056 : .047;
-  part.loft(corgi ? '#a96e49' : rear && side > 0 ? '#62463a' : '#845d48', [
+  part.loft(!corgi && rear && side > 0 ? '#a56d4c' : '#b98260', [
     [-hip+.004,foot*.67,.048,0,.020],[-hip+.009,foot*.96,.059,0,.021],
     [-hip+.024,foot,.065,0,.024],[-hip+.043,foot*.92,.058,0,.020],
     [-hip+.067,foot*.75,.041,0,.009],[-hip+.084,foot*.55,.029,0,.002]
   ], 16);
   for (const toe of [-1, 1]) {
-    part.stroke('#79553e', [[toe*.014,-hip+.033,.082],[toe*.016,-hip+.027,.087],[toe*.017,-hip+.021,.087]], .0022, .25, 4, 4);
+    part.stroke('#98694a', [[toe*.014,-hip+.033,.082],[toe*.016,-hip+.027,.087],[toe*.017,-hip+.021,.087]], .0022, .25, 4, 4);
   }
 }
 
@@ -343,11 +345,11 @@ function makePattern(T, corgi, material) {
   const head = joint('Head', body, [0, corgi ? .165 : .154, corgi ? .217 : .187], p => {
     plush(() => coat(T, p, corgi ? [.185,.157,.155] : [.171,.152,.148], corgi, true));
     muzzle(p, corgi);
-    if (corgi) for (const side of [-1, 1]) p.dot('#b77d54', side*.100,.069,.111,.024,.010,.013,[0,side*.33,side*.19]);
+    if (corgi) for (const side of [-1, 1]) p.dot(lightApricot, side*.100,.069,.111,.024,.010,.013,[0,side*.33,side*.19]);
   });
   joint('Eyes', head, [0,.025,0], p => faceEyes(p, corgi));
   for (const side of [-1,1]) joint(side < 0 ? 'Left ear' : 'Right ear', head,
-    [side * (corgi ? .110 : .142), corgi ? .111 : .081, corgi ? -.020 : -.010], p => plush(() => corgi ? corgiEar(p, side) : floppyEar(p, side)));
+    [side * (corgi ? .114 : .142), corgi ? .118 : .081, corgi ? -.020 : -.010], p => plush(() => corgi ? corgiEar(p, side) : floppyEar(p, side)));
   joint('Tail', body, [0,.019,corgi ? -.244 : -.202], p => plush(() => tail(T, p, corgi)));
   for (const rear of [false, true]) for (const side of [-1,1]) {
     const x = corgi ? .106 : .088, hipY = corgi ? .147 : .165;
