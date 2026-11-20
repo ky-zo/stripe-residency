@@ -280,7 +280,7 @@ $('help').addEventListener('click',showActivities);
 $('activity-list').addEventListener('click',e=>{
   const id=e.target.closest('[data-activity]')?.dataset.activity;
   if(!id)return;help.close();syncBlock();
-  if(id==='desk')world?.takeSeat();else world?.takeActivity(id);
+  if(id==='desk')world?.takeSeat();else if(id==='warung')world?.visitWarung();else world?.takeActivity(id);
 });
 
 function notice(message,delay=2300){
@@ -359,19 +359,30 @@ async function enterWorld(findHandle=null){
   try{
     const w=await getWorld();
     if(ticket!==entryRevision||!inWorld)return;
-    $('world-status').hidden=true;clearTimeout(noticeTimer);
+    $('world-status').hidden=true;clearTimeout(noticeTimer);$('entry-error')?.remove();
     syncBlock();w.start();worldReady=true;
     if(room.get().status==='online')w.applyRoom(room.get(),true);
     finishEntry();
     updateFocus();host.focus({preventScroll:true});
-  }catch{
+  }catch(error){
+    console.error('Island failed to open',error);
     if(ticket!==entryRevision)return;
     $('world-status').hidden=true;
     leaveWorld();
     let note=$('entry-error');
     if(!note){note=document.createElement('p');note.id='entry-error';note.className='entry-error';note.setAttribute('role','status');$('enter').after(note);}
-    note.textContent='3D needs WebGL in this browser. The resident portraits and figure downloads are available below.';
+    // Only blame WebGL when it is really missing. A failed download or a script error deserves a retry.
+    note.textContent=hasWebGL()
+      ?'The island didn’t open. Try again, or reload the page.'
+      :'3D needs WebGL in this browser. The resident portraits and figure downloads are available below.';
   }
+}
+function hasWebGL(){
+  try{
+    const gl=document.createElement('canvas').getContext('webgl2')||document.createElement('canvas').getContext('webgl');
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    return Boolean(gl);
+  }catch{return false;}
 }
 function leaveWorld(){
   ++entryRevision;inWorld=false;worldReady=false;pendingFind=null;world?.stop();room.close();endFocus();requestedClaim=null;

@@ -1,5 +1,5 @@
 import * as T from 'three';
-import { buildEnvironment } from './environment.js';
+import { buildEnvironment, insideWarung, WARUNG_FOOTPRINT, WARUNG_GALLEY, warungFloor } from './environment.js';
 import { createFigure } from './models.js';
 import { createDrive } from './drive.js';
 import {createIslandDogs} from './island-dogs.js';
@@ -18,6 +18,8 @@ import {addIslandSports,sportObstacles} from './island-sports.js';
 const movementKeys=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'];
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Figures stand on the warung boards as well as the sand.
+const floorAt=(x,z)=>Math.max(groundHeight(x,z),warungFloor(x,z));
 
 export function createWorld(host,residents,callbacks) {
   const renderer=new T.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
@@ -105,7 +107,7 @@ export function createWorld(host,residents,callbacks) {
   hitLayer.updateMatrixWorld(true);
   // Paths use the island's permanent furniture. Passing residents give one another room.
   const obstacles=environment.obstacles.concat(sportObstacles);
-  const nav=createNavigation(obstacles,[]),roads=createNavigation(obstacles,[],{clearance:.33});
+  const nav=createNavigation(obstacles,[]),roads=createNavigation(obstacles.concat(WARUNG_FOOTPRINT),[],{clearance:.33});
   const seaRoutes=createNavigation([],[],{step:.75,width:81,height:51,passable:floatable});
   const avatar=new T.Group();scene.add(avatar);
   avatar.position.set(.08,0,5.25);avatar.rotation.y=-.48;
@@ -127,6 +129,7 @@ export function createWorld(host,residents,callbacks) {
   let travelView=null,orbitManuallyUntil=0,shorePending=false,shoreSentAt=0;
   let orbitRadius=0,following=null,repathAt=0,pendingSeat=null;
   const keys=new Set(),cameraFocus=new T.Vector3(0,.57,.4),desired=new T.Vector3(),offset=new T.Vector3();
+  const heading=new T.Vector2(),lead=new T.Vector2(),lastSeen=new T.Vector2();
   const projection=new T.Vector3(),groundHit=new T.Vector3(),seaHit=new T.Vector3(),surfaceHit=new T.Vector3();
   function resize() {
     width=host.clientWidth;height=host.clientHeight;
@@ -141,11 +144,27 @@ export function createWorld(host,residents,callbacks) {
     const follow=T.MathUtils.lerp(wide?.04:(narrow?.88:.68),1,T.MathUtils.smoothstep(Math.hypot(p.x,p.z),13,28));
     const trackSwim=doing==='swim'&&!wide;
     const active=!wide&&Boolean(doing)&&doing!=='lounge';
+    // Smoothed ground velocity. A jump of more than 12 m/s is a snap or correction.
+    const vx=dt?(p.x-lastSeen.x)/dt:0,vz=dt?(p.z-lastSeen.y)/dt:0;lastSeen.set(p.x,p.z);
+    if(snap||!dt||Math.hypot(vx,vz)>12)heading.set(0,0);
+    else heading.lerp({x:vx,y:vz},1-Math.exp(-dt*5));
+    const speed=heading.length(),handsOff=!wide&&!reduced&&!pointerStart&&elapsed>orbitManuallyUntil;
     if((doing==='ride'||doing==='boat')&&!wide&&!pointerStart&&elapsed>orbitManuallyUntil&&(Math.abs(drive.speed)>.20||own?.seat==='play:boat:bow'&&own.walking)){
       const behind=avatar.rotation.y+Math.PI+(doing==='boat'?.67:0)-angle;
       angle+=Math.atan2(Math.sin(behind),Math.cos(behind))*(1-Math.exp(-dt*2.6));
+    }else if((!doing||doing==='swim')&&handsOff&&speed>.6){
+      // On foot the view eases round behind the walk. Heading toward the camera leaves it put.
+      const behind=Math.atan2(heading.x,heading.y)+Math.PI-angle,turnBy=Math.atan2(Math.sin(behind),Math.cos(behind));
+      const weight=1-T.MathUtils.smoothstep(Math.abs(turnBy),1.75,2.45);
+      angle+=turnBy*(1-Math.exp(-dt*.14*weight*Math.min(1,speed/3.6)));
     }
-    desired.set(active?p.x:p.x*follow,wide?1.0:climbing?p.y+1.1:trackSwim?-.20:doing==='surf'||doing==='boat'?.12:.85+groundHeight(p.x,p.z),active?p.z:p.z*follow+(wide?-.62:-.65));
+    // Lead the frame a little in the direction of travel.
+    const leads=!wide&&!reduced&&(!doing||['swim','ride','boat','surf'].includes(doing));
+    const reach=leads?Math.min(speed*.3,doing==='ride'||doing==='boat'||doing==='surf'?1.9:1.1):0;
+    const aim=speed>.05?reach/speed:0;
+    lead.lerp({x:heading.x*aim,y:heading.y*aim},snap?1:1-Math.exp(-dt*2.2));
+    desired.set(active?p.x:p.x*follow,wide?1.0:climbing?p.y+1.1:trackSwim?-.20:doing==='surf'||doing==='boat'?.12:.85+floorAt(p.x,p.z),active?p.z:p.z*follow+(wide?-.62:-.65));
+    desired.x+=lead.x;desired.z+=lead.y;
     if(doing==='padel'&&!wide)desired.set(PADEL.x,.40,PADEL.z);
     const smoothing=snap||reduced?1:1-Math.exp(-dt*(active?9:3.7));
     cameraFocus.lerp(desired,smoothing);
@@ -289,7 +308,7 @@ export function createWorld(host,residents,callbacks) {
     const points=map.path(avatar.position,point);
     if(!points?.length)return false;
     following=null;route=points;arrival=done;const end=points.at(-1);
-    marker.visible=mark;marker.position.set(end.x,Math.max(SWIM_LEVEL,groundHeight(end.x,end.z))+.042,end.z);
+    marker.visible=mark;marker.position.set(end.x,Math.max(SWIM_LEVEL,floorAt(end.x,end.z))+.042,end.z);
     return true;
   }
   function seatOwner(seat){return ensemble.players.find(p=>p.seat!==null&&String(p.seat)===String(seat.id));}
@@ -366,6 +385,14 @@ export function createWorld(host,residents,callbacks) {
     if(!destination)return;
     introView=false;wide=false;callbacks.onCamera(false);spotlit=target;spotlightUntil=elapsed+16;
     if(go(destination,()=>finishFind(target))){following=target;repathAt=elapsed+.5;}
+  }
+  function visitWarung(){
+    if(seated||doing&&doing!=='swim'){afterStand=visitWarung;stand();return;}
+    if(pendingSeat||shorePending)return;
+    introView=false;wide=false;callbacks.onCamera(false);
+    const galley=WARUNG_GALLEY;
+    if(distance(avatar.position,galley)<.3){avatar.rotation.y=galley.yaw;return;}
+    if(go(galley,()=>{avatar.rotation.y=galley.yaw;callbacks.notice('Behind the warung counter');}))callbacks.notice('Walking into the warung');
   }
   function kick(){
     if(seated||doing)return;
@@ -510,7 +537,7 @@ export function createWorld(host,residents,callbacks) {
       if(spot)return {...p,...climbPose(spot,p.progress||0),activity:id,land:spot.land};
     }
     if(id==='swim')return {...p,...playPose(id,now,p.id,p)};
-    const floor=groundHeight(p.x,p.z);
+    const floor=floorAt(p.x,p.z);
     if(id==='ride')return {...p,y:floor+SCOOTER_RIG.rider.y,activity:id};
     const lift=p.seat===null?jumpLift(p.jumpAt,now):0;
     return {...p,y:floor+lift,wading:floor+lift<SWIM_LEVEL-.015,activity:lift?'jump':'',seated:p.seat!==null};
@@ -686,7 +713,7 @@ export function createWorld(host,residents,callbacks) {
     for(const dog of dogs)dog.run(nowMs);
     updateCast(dt,nowMs);
     const walking=move(dt);
-    const {x,z}=avatar.position,floor=groundHeight(x,z);
+    const {x,z}=avatar.position,floor=floorAt(x,z);
     const lift=!doing&&!seated?jumpLift(Math.max(localJump,own?.jumpAt||0),nowMs):0;
     let visualActivity=doing,effort=walking;
     visitorFigure.root.rotation.set(0,0,0,'YXZ');visitorFigure.root.position.z=0;
@@ -736,6 +763,7 @@ export function createWorld(host,residents,callbacks) {
     ring.position.set(x,.038+floor,z);
     ring.scale.setScalar(1+avatar.position.y*.15);updateScooter(dt);
     if(!reduced)environment.update(elapsed);
+    environment.setCutaway(!doing&&insideWarung(x,z)?1:0,reduced?0:dt);
     if(elapsed-shadowAt>.33){renderer.shadowMap.needsUpdate=true;shadowAt=elapsed;}
     setCamera(dt);scanNearby();updateLabels();updateWaves(nowMs);
     renderer.render(scene,camera);
@@ -758,7 +786,7 @@ export function createWorld(host,residents,callbacks) {
     if(destination&&doing===activityId(p.seat)&&go(destination,onArrival,showMarker))following=tracked;
   }
   function toggleCamera(){introView=false;wide=!wide;callbacks.onCamera(wide);return wide;}
-  return {start,stop,find,takeSeat,takeActivity,stand,kick,jump,
+  return {start,stop,find,takeSeat,takeActivity,visitWarung,stand,kick,jump,
     setStick(right,forward){stick.right=right;stick.forward=forward;},
     interact:()=>interact(),toggleCamera,setBlocked,applyRoom,wave,
     setBall(b){ballState=b;},correct,clearRequest(){pendingSeat=null;shorePending=false;}};

@@ -4,6 +4,21 @@ import { BEACH_PROFILE, PALMS, palmTrunk, shoreline } from '../shared/mobility.j
 import { addShoreActivities } from './shore-art.js';
 
 const TAU = Math.PI * 2;
+
+// The warung's boards sit above the sand. Visitors step up from the east side.
+export const WARUNG = { x: -5.15, z: -3.70 };
+export const WARUNG_GALLEY = { x: WARUNG.x + .35, z: WARUNG.z - .04, yaw: 0 };
+export const WARUNG_FOOTPRINT = { x: WARUNG.x + .17, z: WARUNG.z, w: 6.40, d: 2.62 };
+export function warungFloor(x, z) {
+  const lx = x - WARUNG.x, lz = z - WARUNG.z;
+  if (Math.abs(lz) <= 1.27 && Math.abs(lx) <= 2.85) return .225;
+  if (lx > 2.85 && lx <= 3.19 && lz >= -.58 && lz <= .64) return .115;
+  return 0;
+}
+export function insideWarung(x, z) {
+  const lx = x - WARUNG.x, lz = z - WARUNG.z;
+  return Math.abs(lx) <= 2.85 && lz > -1.27 && lz < .9;
+}
 const lerp = (a, b, amount) => a + (b - a) * amount;
 
 function randomStream(seed) {
@@ -221,6 +236,9 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
   const range = (min, max) => lerp(min, max, random());
   const landscape = makeBatch(T, 'Sand, beach and coastal planting');
   const details = makeBatch(T, 'Warung, desks and garden');
+  // The roof, awning and sign fade while you stand inside so the galley stays in view.
+  const roof = makeBatch(T, 'Warung roof and awning');
+  const cutawaySigns = [];
   const shadows = makeContactShadows(T);
   const clay = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.91, side: T.DoubleSide });
   const grain = new T.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: T.DoubleSide });
@@ -377,6 +395,7 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
     mesh.position.set(x,y,z);
     mesh.rotation.x = tilt;
     root.add(mesh);
+    return mesh;
   }
 
   function flower(batch, x, y, z, radius, colour = '#fff1c6') {
@@ -564,13 +583,17 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
   }
 
   function warung() {
-    const cx = -5.15, cz = -3.70;
+    const cx = WARUNG.x, cz = WARUNG.z;
     const x = local => cx + local, z = local => cz + local;
     block(details,'#ccac82',cx,.075,cz,5.70,.15,2.54);
     block(details,'#d9b690',cx,.16,cz,5.54,.13,2.44);
     block(details,'#dcbb8f',cx,1.30,z(-1.14),5.20,2.23,.20);
+    // A timber step leads through the open east side to the galley behind the counter.
+    block(details,'#c49f74',x(3.02),.055,z(.03),.34,.11,1.22);
+    block(details,'#d7b48a',x(3.02),.112,z(.03),.30,.012,1.16);
     for (const sx of [-2.43,2.43]) {
-      block(details,'#d0a978',x(sx),.58,cz,.17,.94,2.28);
+      if (sx < 0) block(details,'#d0a978',x(sx),.58,cz,.17,.94,2.28);
+      else block(details,'#d0a978',x(sx),.58,z(-.88),.17,.94,.52);
       for (const sz of [-1.01,1.13]) {
         block(details,palette.woodDark,x(sx),1.44,z(sz),.17,2.52,.17);
         block(details,'#d6b17b',x(sx),.42,z(sz),.22,.40,.22);
@@ -644,7 +667,7 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
         const b = corners[3].map((value,j)=>lerp(value,corners[2][j],u));
         return [x(lerp(a[0],b[0],v)),lerp(a[1],b[1],v)+raise,z(lerp(a[2],b[2],v))];
       };
-      details.quad(sample(0,0),sample(1,0),sample(1,1),sample(0,1),'#995336');
+      roof.quad(sample(0,0),sample(1,0),sample(1,1),sample(0,1),'#995336');
       const rows = 5;
       for (let row=0;row<rows;row++) {
         for(let col=0;col<columns;col++) {
@@ -653,29 +676,29 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
           const colour=pick(tiles);
           const a=sample(u0,v0,.025), b=sample(um,v0,.077), c=sample(u1,v0,.020);
           const d=sample(u0,v1,.013), e=sample(um,v1,.043), f=sample(u1,v1,.012);
-          details.quad(a,b,e,d,colour); details.quad(b,c,f,e,colour);
-          details.face(a,sample(um,v0,.010),b,'#a25438');
-          details.face(b,sample(um,v0,.010),c,'#a25438');
+          roof.quad(a,b,e,d,colour); roof.quad(b,c,f,e,colour);
+          roof.face(a,sample(um,v0,.010),b,'#a25438');
+          roof.face(b,sample(um,v0,.010),c,'#a25438');
         }
       }
     }
     tiledPanel(roofFront,24); tiledPanel(roofBack,24); tiledPanel(west,10); tiledPanel(east,10);
-    rod(details,'#ab583a',[x(-2.04),3.77,cz],[x(2.04),3.77,cz],.105);
+    rod(roof,'#ab583a',[x(-2.04),3.77,cz],[x(2.04),3.77,cz],.105);
     for(const side of [-1,1]) {
       const xx=x(side*1.99);
-      rod(details,'#ba6944',[xx,3.78,cz],[xx+side*.14,3.89,cz],.074);
-      ball(details,'#bc6b46',xx+side*.16,3.93,cz,.071,.11,.068,0,0,-side*.20);
-      ball(details,'#d48554',xx+side*.13,4.015,cz,.043,.073,.05,0,0,side*.22);
+      rod(roof,'#ba6944',[xx,3.78,cz],[xx+side*.14,3.89,cz],.074);
+      ball(roof,'#bc6b46',xx+side*.16,3.93,cz,.071,.11,.068,0,0,-side*.20);
+      ball(roof,'#d48554',xx+side*.13,4.015,cz,.043,.073,.05,0,0,side*.22);
     }
     for(const side of [-1,1]) {
-      for(const zz of [-1.43,1.34]) rod(details,'#be6944',[x(side*3.01),2.64,z(zz)],[x(side*2),3.76,cz],.075);
+      for(const zz of [-1.43,1.34]) rod(roof,'#be6944',[x(side*3.01),2.64,z(zz)],[x(side*2),3.76,cz],.075);
     }
     block(details,'#845034',cx,2.56,z(1.34),6.03,.16,.14);
-    block(details,'#97643c',cx,2.52,z(1.46),2.95,.64,.14,-.09);
-    sign(cx,2.535,z(1.55),2.82,.51,'WARUNG','warung',-.09);
+    block(roof,'#97643c',cx,2.52,z(1.46),2.95,.64,.14,-.09);
+    cutawaySigns.push(sign(cx,2.535,z(1.55),2.82,.51,'WARUNG','warung',-.09));
     for(const xx of [-2.34,2.34]) {
-      rod(details,'#9d7549',[x(xx),2.18,z(1.24)],[x(xx),1.91,z(2.15)],.047);
-      rod(details,'#8b673f',[x(xx),1.52,z(1.19)],[x(xx),1.94,z(2.10)],.04);
+      rod(roof,'#9d7549',[x(xx),2.18,z(1.24)],[x(xx),1.91,z(2.15)],.047);
+      rod(roof,'#8b673f',[x(xx),1.52,z(1.19)],[x(xx),1.94,z(2.10)],.04);
     }
     const start=-2.71, width=5.42, stripes=15;
     for(let i=0;i<stripes;i++) {
@@ -683,12 +706,12 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
       const shade=i%2 ? '#467e69' : '#f6e6bc';
       const topA=[ax,2.205,z(1.23)],topB=[bx,2.205,z(1.23)];
       const edgeA=[ax,1.955,z(2.13)],edgeB=[bx,1.955,z(2.13)];
-      details.quad(topA,topB,edgeB,edgeA,shade);
+      roof.quad(topA,topB,edgeB,edgeA,shade);
       let previous=[ax,1.85,z(2.145)];
       for(let k=1;k<=6;k++){
         const t=k/6;
         const bottom=[lerp(ax,bx,t),1.85-.105*Math.sin(t*Math.PI)**.76,z(2.145)];
-        details.quad([lerp(ax,bx,(k-1)/6),1.955,z(2.13)],[lerp(ax,bx,t),1.955,z(2.13)],bottom,previous,shade);
+        roof.quad([lerp(ax,bx,(k-1)/6),1.955,z(2.13)],[lerp(ax,bx,t),1.955,z(2.13)],bottom,previous,shade);
         previous=bottom;
       }
     }
@@ -716,8 +739,10 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
       rod(details,'#9a7653',[mx+shift,.05,mz-.32],[mx+shift,1.15,mz-.05],.036);
     }
     planter(x(-2.81),z(1.30),.96,true);
-    planter(x(2.80),z(-.86),.89,false,'#c89269');
-    obstacle(cx,cz+.11,5.72,2.42);
+    planter(x(2.80),z(-1.62),.89,false,'#c89269');
+    obstacle(cx,z(-.965),5.72,.61);
+    obstacle(cx,z(.92),5.72,.70);
+    obstacle(x(-2.60),z(-.045),.52,1.24);
     obstacle(mx,mz,.76,.52);
     shadows.ellipse(cx,cz+.16,3.28,1.71,.30);
   }
@@ -989,10 +1014,23 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
 
   landscape.finish(grain,root,false);
   details.finish(clay,root);
+  const roofClay = clay.clone();
+  roofClay.transparent = true;
+  roof.finish(roofClay,root);
+  const cutawayMaterials = [roofClay, ...cutawaySigns.map(mesh => mesh.material)];
+  for (const material of cutawayMaterials) material.transparent = true;
+  let cutaway = 0;
   shadows.finish(root);
   for(const geometry of Object.values(props)) geometry.dispose();
   return {
     obstacles, seats:SEATS, setSwimmer,
     update(t) { for (const animate of animated) animate(t); },
+    // Fades toward 1 while the local player is inside; snaps with dt = 0.
+    setCutaway(target, dt) {
+      if (cutaway === target) return;
+      cutaway = dt ? cutaway + (target - cutaway) * (1 - Math.exp(-dt * 7)) : target;
+      if (Math.abs(cutaway - target) < .003) cutaway = target;
+      for (const material of cutawayMaterials) material.opacity = 1 - cutaway * .84;
+    },
   };
 }
