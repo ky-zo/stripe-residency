@@ -101,18 +101,18 @@
     </dialog>
     <dialog id="member-dialog" class="member-dialog" aria-labelledby="member-title">
       <button type="button" class="round-btn modal-close" id="member-close" aria-label="Close member editor"><i data-icon="close"></i></button>
-      <form id="member-form">
+      <form id="member-form" autocomplete="off">
         <div class="member-intro">
           <div class="member-figure" id="member-preview" role="img" aria-label="Your custom clay figure"></div>
-          <div><h2 id="member-title" tabindex="-1">Join the residency</h2><p>Your figure joins the resident list. Come back in this browser to play as yourself.</p></div>
+          <div><h2 id="member-title" tabindex="-1">Visit as yourself</h2><p>People on the island can see your guest name and figure until you leave.</p></div>
         </div>
         <div class="member-fields">
-          <label class="member-field" for="member-name">Your name<input id="member-name" name="name" maxlength="32" autocomplete="given-name" placeholder="Your name" required></label>
+          <label class="member-field" for="member-name">Your name<input id="member-name" name="name" maxlength="32" autocomplete="off" placeholder="Your name" required></label>
           <label class="member-field" for="member-note">Building <span>(optional)</span><input id="member-note" name="note" maxlength="100" placeholder="What are you working on?"></label>
           <div id="member-options"></div>
           <p id="member-feedback" class="member-feedback" role="status"></p>
         </div>
-        <div class="member-footer"><button type="button" id="member-remove" class="text-btn" hidden>Remove my member</button><button id="member-submit" class="primary compact" type="submit">Join the island</button></div>
+        <div class="member-footer"><button type="button" id="member-remove" class="text-btn" hidden>Clear guest details</button><button id="member-submit" class="primary compact" type="submit">Join the island</button></div>
       </form>
     </dialog>
     <dialog id="help-dialog" class="help-dialog" aria-labelledby="help-title">

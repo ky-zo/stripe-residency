@@ -7,7 +7,7 @@ const notes={
   phuctm97:       [.131,.003,.047,.020,'bright'],
   ky__zo:         [.143,-.003,.047,.015,'crooked'],
   erwin_ai:       [.135,.002,.059,.025,'bright'],
-  dannypostma:    [.139,.005,.042,.017,'quiet'],
+  powpow:    [.139,.005,.042,.017,'quiet'],
   josefbuettgen:  [.144,-.004,.047,.021,'quiet'],
   melanieklenner: [.138,.001,.058,.026,'bright'],
   ann_nnng:       [.143,-.006,.043,.017,'quiet'],

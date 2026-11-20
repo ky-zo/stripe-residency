@@ -7,27 +7,18 @@ import { createRoom } from './room.js';
 import { createPartyUI } from './party-ui.js';
 import { getFocus, beginFocus, toggleFocus, endFocus } from './focus.js';
 import {createMemberEditor,paintMember} from './member-ui.js';
-import {memberHandle,appearanceKey} from '../shared/members.js';
+import {memberHandle} from '../shared/members.js';
 import photoSources from '../photo-sources.json';
 
 const $=id=>document.getElementById(id);
 renderIcons();
 const byHandle=new Map(residents.map(r=>[r.handle,r]));
-const members=new Map(),memberCards=new Map();
-const cardObserver=new IntersectionObserver(entries=>{
-  for(const entry of entries)if(entry.isIntersecting){
-    const card=entry.target,r=members.get(card.dataset.handle);
-    if(r)paintMember(card.querySelector('img'),r.appearance);
-    cardObserver.unobserve(card);
-  }
-},{rootMargin:'120px'});
-let directoryVersion=0,activity=null;
+let activity=null;
 const islandActivities={
   josefbuettgen:'Josef swims laps in the cove beside the wooden jetty.',
   odd_joel:'IndiJo stretches out on the terracotta-striped sunbed.',
   neilhanyd:'Neil has a book open on the sun deck.',
   ann_nnng:'Ann is at her laptop by the warung.',
-  dannypostma:'Danny stops along his walk to photograph the island.',
   sandrokratz:'Sandro takes stretch breaks on the mat.'
 };
 const list=$('resident-list'),profile=$('profile-dialog'),help=$('help-dialog');
@@ -35,12 +26,12 @@ const postcard=$('postcard'),play=$('play-space'),host=$('world-host');
 const portraitUrl=h=>'/portraits/'+h+'.webp';
 const motion=matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth';
 let world,worldTask,inWorld=false,sitting=false,entryRevision=0,noticeTimer;
-let party,ballNear=false,pickerOpen=false,restoreSeat=false,worldReady=false,pendingFind=null;
+let party,ballNear=false,pickerOpen=false,worldReady=false,pendingFind=null;
 let activeResident,modelDispose=null,artRevision=0,downloading=false,lastTrigger=null;
 
 const room=createRoom({
   state(state,welcome){
-    if(state.status==='online'){directoryVersion++;renderMembers(state.members);}
+    syncGuestProfile(state);
     if(worldReady)world.applyRoom(state,welcome);
     updateParty();updateProfileClaim();
     if(welcome)finishEntry();
@@ -52,21 +43,22 @@ const room=createRoom({
   }
 });
 const memberEditor=createMemberEditor({
-  async onSave(details){await room.saveMember(details);if(!inWorld)await enterWorld(null,true);},
-  async onRemove(){await room.removeMember();if(!inWorld){await fetchDirectory();room.close();}},
+  async onSave(details){
+    try{await room.setGuest(details);}catch(error){if(!inWorld)room.close();throw error;}
+    if(!inWorld)await enterWorld();
+  },
+  onRemove:()=>room.clearGuest(),
   onToggle(open){syncBlock();if(!open&&inWorld)host.focus({preventScroll:true});}
 });
-function openMember(){memberEditor.open(room.myMember());}
+function openMember(){memberEditor.open(room.myGuest());}
 function showActivities(){if(!help.open)help.showModal();syncBlock();}
 function syncBlock(){world?.setBlocked(profile.open||help.open||pickerOpen||memberEditor.isOpen());}
 $('join-member').addEventListener('click',openMember);
-function updateParty(){party?.render({...room.get(),nearBall:ballNear,seated:sitting});if(inWorld)paintPresence();}
+function updateParty(){party?.render({...room.get(),nearBall:ballNear,seated:sitting});paintPresence();}
 function finishEntry(){
   if(!worldReady||!inWorld||room.get().status!=='online')return;
   if(requestedClaim){const h=requestedClaim;requestedClaim=null;room.trigger('claim',{handle:h});}
   else if(pendingFind){const h=pendingFind;pendingFind=null;world.find(h);}
-  else if(restoreSeat&&getFocus()&&!sitting)world.takeSeat(null,true);
-  restoreSeat=false;
 }
 let invitationUrl=location.pathname.startsWith('/join/')?location.origin+location.pathname:null;
 async function copyInvite(){
@@ -89,8 +81,8 @@ function updateProfileClaim(){
   const mine=Boolean(owner)&&owner===state.ownId,used=Boolean(owner)&&!mine;
   const b=$('claim-profile');
   if(activeResident.custom){
-    const isOwn=room.myMember()?.id===activeResident.id;
-    b.hidden=!isOwn;b.disabled=false;b.textContent='Edit your member';
+    const isOwn=room.myGuest()?.id===activeResident.id;
+    b.hidden=!isOwn;b.disabled=false;b.textContent='Edit your guest';
     $('find-resident').hidden=isOwn;
     return;
   }
@@ -107,7 +99,7 @@ function playAsResident(){
   if(room.get().claims[r.handle]===room.get().ownId&&room.get().ownId){room.trigger('release');return;}
   lastTrigger=null;dismiss(profile);
   if(inWorld){room.trigger('claim',{handle:r.handle});host.focus({preventScroll:true});}
-  else{requestedClaim=r.handle;enterWorld(null,true);}
+  else{requestedClaim=r.handle;enterWorld();}
 }
 $('claim-profile').addEventListener('click',playAsResident);
 
@@ -120,64 +112,37 @@ function addCard(r,i){
   card.className='resident';card.type='button';card.setAttribute('aria-label','Meet '+r.name);card.dataset.handle=r.handle;
   const tile=document.createElement('span');tile.className='portrait-tile';
   const photo=new Image(544,544);photo.alt='';photo.loading=i<8?'eager':'lazy';photo.decoding='async';
-  if(r.custom)cardObserver.observe(card);else photo.src=portraitUrl(r.handle);
+  photo.src=portraitUrl(r.handle);
   const name=document.createElement('span');name.className='resident-name';name.textContent=r.name;card.dataset.short=r.shortName||r.name;
   const role=document.createElement('span');role.className='resident-role';role.textContent=r.role;
   tile.append(photo);card.append(tile,name,role);card.addEventListener('click',()=>openProfile(r.handle,card));list.append(card);
-  return {card,photo,name};
 }
 residents.forEach(addCard);
-function renderMembers(directory){
-  const seen=new Set();
-  for(const entry of directory||[]){
-    const h=memberHandle(entry.id),r={...entry,handle:h,custom:true,shortName:entry.name,role:'Island member'};
-    seen.add(h);
-    const previous=members.get(h);members.set(h,r);
-    if(!previous){memberCards.set(h,addCard(r,residents.length+memberCards.size));}
-    else{
-      const {card,name}=memberCards.get(h);
-      if(previous.name!==r.name){name.textContent=r.name;card.setAttribute('aria-label','Meet '+r.name);}
-      if(appearanceKey(previous.appearance)!==appearanceKey(r.appearance))cardObserver.observe(card);
-      if(profile.open&&activeResident?.handle===h&&JSON.stringify(previous)!==JSON.stringify(r))openProfile(h,lastTrigger);
-    }
-  }
-  for(const h of members.keys())if(!seen.has(h)){
-    if(profile.open&&activeResident?.handle===h)dismiss(profile);
-    const card=memberCards.get(h).card;cardObserver.unobserve(card);card.remove();memberCards.delete(h);members.delete(h);
-  }
-  const join=$('join-member');join.firstChild.textContent=room.myMember()?'Edit your member ':'Join as yourself ';
-  expandRoster(list.classList.contains('expanded'));
+function liveGuest(handle,state){
+  if(!inWorld||state.status!=='online')return null;
+  const entry=state.members.find(g=>memberHandle(g.id)===handle);
+  if(!entry||!state.players.some(p=>p.memberId===entry.id&&!p.handle))return null;
+  return {...entry,handle,custom:true,shortName:entry.name,role:'Visiting guest'};
 }
-async function fetchDirectory(){
-  const version=directoryVersion;
-  try{
-    const response=await fetch('/api/members',{cache:'no-store'});
-    if(response.ok){const data=await response.json();if(version===directoryVersion)renderMembers(data.members);}
-  }catch{/* Live room snapshots also carry the directory. */}
+function syncGuestProfile(state){
+  if(!activeResident?.custom)return;
+  const guest=liveGuest(activeResident.handle,state);
+  if(guest){
+    if(profile.open&&JSON.stringify(guest)!==JSON.stringify(activeResident))openProfile(guest.handle,lastTrigger);
+    return;
+  }
+  if(profile.open)dismiss(profile);
+  activeResident=null;lastTrigger=null;
+  $('resident-name').textContent='';$('resident-bio').textContent='';
+  const image=$('profile-image');image.removeAttribute('src');image.removeAttribute('data-look');image.alt='';
 }
 let hudFolded=false,gameFullscreen=false,originalScroll=0;
 const roster=$('residents'),prevButton=roster.querySelector('.hud-prev'),nextButton=roster.querySelector('.hud-next');
-const guestsOnHud=new Map();
 function paintPresence(){
-  const state=room.get(),online=new Set(),guests=new Set();
-  const atStart=list.scrollLeft<3;let changed=false;
-  for(const p of state.players){
-    const handle=p.handle||(p.memberId?memberHandle(p.memberId):null);
-    if(handle){online.add(handle);continue;}
-    guests.add(p.id);
-    if(guestsOnHud.has(p.id))continue;
-    const mine=p.id===state.ownId,name=mine?'You':'Guest';
-    const chip=document.createElement('button');chip.type='button';chip.className='resident hud-guest';
-    chip.dataset.short=name;chip.dataset.present='true';chip.title=mine?'Your visitor':'Find this visitor';
-    chip.setAttribute('aria-label',chip.title);chip.disabled=mine;
-    const portrait=document.createElement('span');portrait.className='portrait-tile guest-tile';
-    portrait.style.setProperty('--visitor-colour',p.color);portrait.innerHTML=icon('walk');
-    chip.append(portrait);chip.addEventListener('click',()=>{world?.findGuest(p.id);host.focus({preventScroll:true});});
-    list.append(chip);guestsOnHud.set(p.id,chip);changed=true;
-  }
-  for(const [id,chip] of guestsOnHud)if(!guests.has(id)){chip.remove();guestsOnHud.delete(id);changed=true;}
+  const claims=room.get().claims,atStart=list.scrollLeft<3;
+  let changed=false;
   for(const card of list.querySelectorAll('[data-handle]')){
-    const value=String(online.has(card.dataset.handle));
+    const value=String(Boolean(inWorld&&claims[card.dataset.handle]));
     if(card.dataset.present!==value){card.dataset.present=value;changed=true;}
   }
   if(changed&&atStart)requestAnimationFrame(()=>{if(inWorld)list.scrollLeft=0;});
@@ -206,18 +171,18 @@ function expandRoster(expanded) {
   }else{
     roster.classList.remove('folded');list.classList.toggle('expanded',expanded);
     button.setAttribute('aria-expanded',String(expanded));button.removeAttribute('aria-label');button.removeAttribute('title');
-    const label=expanded?'Show less':'View all '+(residents.length+members.size);
+    const label=expanded?'Show less':'View all '+residents.length;
     button.innerHTML=icon(expanded?'row':'grid')+'<span>'+label+'</span>';
   }
   syncRail();
 }
 $('all').addEventListener('click',()=>{
   if(inWorld){hudFolded=!hudFolded;expandRoster(false);return;}
-  const expand=!list.classList.contains('expanded');expandRoster(expand);if(!expand)list.scrollLeft=0;else fetchDirectory();
+  const expand=!list.classList.contains('expanded');expandRoster(expand);if(!expand)list.scrollLeft=0;
 });
-renderMembers([]);fetchDirectory();
+expandRoster(false);
 function activeNav(which){$('nav-island').classList.toggle('active',which==='island');$('nav-residents').classList.toggle('active',which==='residents');}
-$('nav-residents').addEventListener('click',()=>{expandRoster(true);activeNav('residents');if(!inWorld)fetchDirectory();});
+$('nav-residents').addEventListener('click',()=>{expandRoster(true);activeNav('residents');});
 $('nav-island').addEventListener('click',()=>{activeNav('island');if(inWorld)leaveWorld();});
 document.querySelector('.wordmark').addEventListener('click',()=>{activeNav('island');if(inWorld)leaveWorld();});
 window.addEventListener('scroll',()=>{
@@ -243,21 +208,28 @@ function portraitView(){
   $('profile-image').hidden=false;$('download-model').hidden=true;$('download-status').hidden=true;
   $('view-portrait').setAttribute('aria-pressed','true');$('view-model').setAttribute('aria-pressed','false');
 }
+function optionalLink(element,url){
+  element.hidden=!url;
+  if(url)element.href=url;else element.removeAttribute('href');
+}
 function openProfile(handle,trigger=null){
-  const r=byHandle.get(handle)||members.get(handle);
+  const r=byHandle.get(handle)||liveGuest(handle,room.get());
   if(!r)return;
   activeResident=r;lastTrigger=trigger;portraitView();$('claim-status').hidden=true;updateProfileClaim();
   const img=$('profile-image');
   img.removeAttribute('data-look');
   if(r.custom){img.removeAttribute('src');paintMember(img,r.appearance);}
   else img.src=portraitUrl(r.handle);
-  img.alt=r.custom?'Clay figure of '+r.name:'Clay portrait of '+r.name+' with a '+r.prop.toLowerCase()+'.';
+  img.alt='Clay figure of '+r.name+(r.prop?' with a '+r.prop.toLowerCase():'')+'.';
   $('resident-role').textContent=r.role;$('resident-name').textContent=r.name;
   const user=$('resident-handle'),source=$('resident-source'),bio=$('resident-bio');
-  $('resident-links').hidden=source.hidden=$('resident-prop').closest('.keepsake').hidden=Boolean(r.custom);
-  if(!r.custom){user.href=r.profile;user.textContent='@'+r.handle;source.href=r.source;source.setAttribute('aria-label','Source for '+r.name+'’s field note');$('resident-prop').textContent=r.prop;}
-  if(!r.custom)$('resident-photo').href=photoSources[r.handle];
-  bio.textContent=r.custom?r.note:r.bio;bio.hidden=!bio.textContent;
+  const photo=$('resident-photo'),prop=$('resident-prop');
+  optionalLink(user,r.profile);user.textContent=r.profile?'@'+r.handle:'';
+  optionalLink(source,r.source);optionalLink(photo,photoSources[r.handle]);
+  if(r.source)source.setAttribute('aria-label','Source for '+r.name+'’s field note');else source.removeAttribute('aria-label');
+  $('resident-links').hidden=user.hidden&&photo.hidden;
+  prop.textContent=r.prop||'';prop.closest('.keepsake').hidden=!r.prop;
+  bio.textContent=(r.custom?r.note:r.bio)||'';bio.hidden=!bio.textContent;
   const detail=$('resident-activity');detail.textContent=islandActivities[r.handle]||'';detail.hidden=!detail.textContent;
   $('profile-art').style.backgroundColor=r.custom?'#e6e8db':r.backdrop;
   if(!profile.open)profile.showModal();
@@ -355,7 +327,7 @@ function getWorld(){
   }
   return worldTask;
 }
-async function enterWorld(findHandle=null,claiming=false){
+async function enterWorld(findHandle=null){
   const ticket=++entryRevision;
   if(!inWorld){
     originalScroll=window.scrollY;hudFolded=false;document.body.classList.add('playing');
@@ -364,7 +336,7 @@ async function enterWorld(findHandle=null,claiming=false){
     }
   }
   inWorld=true;worldReady=false;pendingFind=findHandle;postcard.hidden=true;play.hidden=false;activeNav('island');
-  restoreSeat=!findHandle&&!claiming&&Boolean(getFocus());room.open();updateParty();expandRoster(false);list.scrollLeft=0;
+  room.open();updateParty();expandRoster(false);list.scrollLeft=0;
   window.scrollTo({top:0,behavior:motion});
   if(!world)notice('Opening the courtyard…',30000);
   try{
@@ -385,12 +357,12 @@ async function enterWorld(findHandle=null,claiming=false){
   }
 }
 function leaveWorld(){
-  ++entryRevision;inWorld=false;worldReady=false;pendingFind=null;world?.stop();room.close();restoreSeat=false;requestedClaim=null;
+  ++entryRevision;inWorld=false;worldReady=false;pendingFind=null;world?.stop();room.close();endFocus();requestedClaim=null;
   activity=null;sitting=false;clearStick();postcard.hidden=false;play.hidden=true;clearTimeout(noticeTimer);
   document.body.classList.remove('playing');
   if(gameFullscreen&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});
-  gameFullscreen=false;for(const chip of guestsOnHud.values())chip.remove();guestsOnHud.clear();
-  expandRoster(list.classList.contains('expanded'));window.scrollTo({top:originalScroll,behavior:'instant'});fetchDirectory();
+  gameFullscreen=false;
+  expandRoster(list.classList.contains('expanded'));window.scrollTo({top:originalScroll,behavior:'instant'});
   $('enter').focus({preventScroll:true});
 }
 $('enter').addEventListener('click',()=>enterWorld());
@@ -404,9 +376,6 @@ $('find-resident').addEventListener('click',()=>{
 });
 $('focus-toggle').addEventListener('click',()=>{toggleFocus();updateFocus();});
 $('stand').addEventListener('click',()=>{endFocus();sitting=false;world?.stand();updateFocus();host.focus({preventScroll:true});});
-window.addEventListener('pagehide',()=>room.close());
-window.addEventListener('pageshow',e=>{if(e.persisted){if(inWorld)room.open();else fetchDirectory();}});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!inWorld)fetchDirectory();});
+window.addEventListener('pagehide',()=>{if($('member-dialog').open)$('member-dialog').close();if(inWorld)leaveWorld();else room.close();});
 setInterval(()=>{if(sitting)updateFocus();},500);
 if(location.hash==='#residents')expandRoster(true);
-if(getFocus() && location.hash!=='#residents')enterWorld();

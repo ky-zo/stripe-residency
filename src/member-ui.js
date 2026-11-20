@@ -1,4 +1,5 @@
 import {appearanceOptions,appearanceKey,defaultAppearance,memberDetails} from '../shared/members.js';
+import {matchingResident} from './residents.js';
 import './member.css';
 
 const labels={skin:'Skin tone',hairStyle:'Hairstyle',hair:'Hair color',shirt:'Shirt color'};
@@ -22,7 +23,7 @@ export function createMemberEditor({onSave,onRemove,onToggle}){
   const photo=new Image(136,136);
   photo.alt='';byId('member-preview').append(photo);
   const inputs=new Map();
-  let appearance,editing=false,working=false,confirmRemove=false;
+  let appearance,editing=false,working=false;
   for(const [part,choices] of Object.entries(appearanceOptions)){
     const field=document.createElement('fieldset'),legend=document.createElement('legend'),row=document.createElement('div');
     legend.textContent=labels[part];row.className='look-choices';field.append(legend,row);options.append(field);
@@ -40,30 +41,33 @@ export function createMemberEditor({onSave,onRemove,onToggle}){
     form.querySelectorAll('input').forEach(el=>{el.disabled=value;});
   }
   function open(member){
-    editing=Boolean(member);confirmRemove=false;busy(false);feedback.textContent='';
+    editing=Boolean(member);busy(false);feedback.textContent='';
     name.value=member?.name||'';note.value=member?.note||'';appearance={...(member?.appearance||defaultAppearance)};
     for(const [part,value] of Object.entries(appearance)) {const input=inputs.get(part+value);if(input)input.checked=true;}
     paintMember(photo,appearance);
-    byId('member-title').textContent=editing?'Your island member':'Join the residency';
-    submit.textContent=editing?'Save and play':'Join the island';remove.textContent='Remove my member';remove.hidden=!editing;
+    byId('member-title').textContent=editing?'Your guest':'Visit as yourself';
+    submit.textContent=editing?'Apply changes':'Join the island';remove.hidden=!editing;
     if(!dialog.open){dialog.showModal();onToggle(true);}
     (matchMedia('(pointer:coarse)').matches?byId('member-title'):name).focus({preventScroll:true});
   }
   close.addEventListener('click',()=>dialog.close());
   dialog.addEventListener('cancel',e=>{if(working)e.preventDefault();});
-  dialog.addEventListener('close',()=>onToggle(false));
+  dialog.addEventListener('close',()=>{
+    form.reset();appearance=null;photo.removeAttribute('data-look');photo.removeAttribute('src');onToggle(false);
+  });
   form.addEventListener('submit',async e=>{
     e.preventDefault();if(working)return;
     const details=memberDetails({name:name.value,note:note.value,appearance});
     if(!details){feedback.textContent='Enter a name to join the island.';name.focus();return;}
-    busy(true);feedback.textContent='';submit.textContent='Saving…';
+    const resident=matchingResident(details.name);
+    if(resident){feedback.textContent='Open '+resident.name+' in the resident list, or choose another guest name.';name.focus();return;}
+    busy(true);feedback.textContent='';submit.textContent=editing?'Updating…':'Joining…';
     try{await onSave(details);dialog.close();}
-    catch(error){feedback.textContent=error.message;submit.textContent=editing?'Save and play':'Join the island';}
+    catch(error){feedback.textContent=error.message;submit.textContent=editing?'Apply changes':'Join the island';}
     finally{busy(false);}
   });
   remove.addEventListener('click',async()=>{
     if(working)return;
-    if(!confirmRemove){confirmRemove=true;remove.textContent='Confirm removal';feedback.textContent='This removes your figure from the resident list.';return;}
     busy(true);
     try{await onRemove();dialog.close();}
     catch(error){feedback.textContent=error.message;}

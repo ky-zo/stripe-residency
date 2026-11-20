@@ -26,4 +26,3 @@ export function memberDetails(input) {
   if (!name || [...name].length > 32 || [...note].length > 100 || !appearance) return null;
   return {name, note, appearance};
 }
-export const validMemberKey = key => typeof key === 'string' && /^[a-f0-9]{64}$/.test(key);

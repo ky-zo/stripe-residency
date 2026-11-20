@@ -8,7 +8,7 @@ const looks = {
   phuctm97: { skin: '#edb68d', hair: '#211c25', style: 'swoop', top: '#59769b', pants: '#354453', outfit: 'denimHood', glasses: 'square', prop: 'house' },
   ky__zo: { skin: '#d6a078', hair: '#684d3b', style: 'parted', top: '#373642', pants: '#807b70', outfit: 'tee', prop: 'helicopter' },
   erwin_ai: { skin: '#f2c09e', hair: '#83573e', style: 'swept', top: '#3c6051', pants: '#47515b', outfit: 'pendant', beard: 'short', prop: 'lens' },
-  dannypostma: { skin: '#e7b193', hair: '#41312f', style: 'knot', top: '#c54e3a', pants: '#463c40', outfit: 'silk', glasses: 'wire', beard: 'full', prop: 'camera' },
+  powpow: { skin: '#e7b193', hair: '#41312f', style: 'knot', top: '#c54e3a', pants: '#463c40', outfit: 'silk', glasses: 'wire', beard: 'full', prop: 'camera' },
   josefbuettgen: { skin: '#e6af85', hair: '#95532d', style: 'quiff', top: '#de663a', pants: '#4c6576', outfit: 'lanyard', prop: 'fish' },
   melanieklenner: { skin: '#f0c3a2', hair: '#805b40', style: 'halfUp', top: '#efe5d9', pants: '#83927a', outfit: 'blouse', prop: 'mallet', slim: true },
   ann_nnng: { skin: '#e2ad85', hair: '#282528', style: 'long', top: '#e9e4d4', pants: '#756254', outfit: 'turtleneck', prop: 'monitor', slim: true },
@@ -36,7 +36,7 @@ const perStudio = new WeakMap();
 // Width, height, eye opening, nose width, natural head tilt.
 const expressions = {
   phuctm97:[.98,1,.86,1.05,-.018], ky__zo:[.99,1.00,.95,1.08,.046],
-  erwin_ai:[.96,1,.91,.95,-.011], dannypostma:[.98,1.015,.97,1.16,.018],
+  erwin_ai:[.96,1,.91,.95,-.011], powpow:[.98,1.015,.97,1.16,.018],
   josefbuettgen:[.96,1.02,1,.91,-.026], melanieklenner:[.94,1,1.04,.91,.046],
   ann_nnng:[.94,1,.95,.88,-.046], loaibassam:[.91,1.025,1.04,1.04,.013],
   sup_nim:[.97,1,.98,1.06,-.016], founderish:[1.03,.97,.91,.97,-.024],

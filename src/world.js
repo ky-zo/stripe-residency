@@ -2,6 +2,8 @@ import * as T from 'three';
 import { buildEnvironment } from './environment.js';
 import { createFigure } from './models.js';
 import { createDrive } from './drive.js';
+import {createIslandDogs} from './island-dogs.js';
+import {createDogRun} from './dog-runs.js';
 import { createScooter, SCOOTER_RIG } from './scooter.js';
 import { groundHeight, inLagoon, nearbyBeach, palmTrunk, climbSpots, climbPose, jumpLift, JUMP_MS, shoreActivity, SCOOTER_START, scooterSpot, SWIM_LEVEL, waterEntry } from '../shared/mobility.js';
 import { createNavigation } from './navigation.js';
@@ -42,6 +44,14 @@ export function createWorld(host,residents,callbacks) {
   const residentPositions=[],figures=[],byHandle=new Map(),residentHits=[];
   const peers=new Map(),guests=new Map(),peerLabels=new Map(),waveLabels=new Map(),replyWaves=new Map();
   const room=callbacks.room;
+  const dogs=createIslandDogs(T).map(dog=>{
+    scene.add(dog.root);
+    const label=document.createElement('span');
+    label.className='dog-label';label.dataset.dog=dog.name;label.textContent=dog.name;label.hidden=true;
+    label.setAttribute('role','img');label.setAttribute('aria-label',dog.name+', island dog');
+    callbacks.label.parentElement.append(label);
+    return {...dog,label,run:createDogRun(T,dog)};
+  });
   let ensemble={status:'offline',players:[],claims:{},ownId:null};
   let own=null,ballState=initialBall,localKey='',visitorFigure,ballNear=false;
   for(const [i,resident] of residents.entries()){
@@ -145,6 +155,10 @@ export function createWorld(host,residents,callbacks) {
   function updateLabels() {
     const p=avatar.position;
     labelAt(callbacks.youLabel,p,p.y+(doing==='swim'?.99:doing==='lounge'?1.18:1.85),!seated);
+    for(const dog of dogs){
+      const position=dog.root.position;
+      labelAt(dog.label,position,position.y+(dog.name==='PowPow2'?.79:.66));
+    }
     const current=hovered || (elapsed<spotlightUntil?spotlit:null) || (nearest?.type==='resident' && !ensemble.claims[nearest.resident.handle]?nearest:null);
     if(current){
       const text=current.type==='resident'?current.resident.shortName:(current.label||'Guest');
@@ -340,13 +354,22 @@ export function createWorld(host,residents,callbacks) {
     hitLayer.remove(guest.hit);const idx=hitObjects.indexOf(guest.hit);if(idx>=0)hitObjects.splice(idx,1);
     if(following===guest.target)cancelWalk();
   }
+  function clearVisitors(){
+    for(const [id,guest] of guests)removeGuest(id,guest);
+    for(const id of peers.keys())environment.setSwimmer(null,0,id);
+    peers.clear();
+    for(const label of peerLabels.values())label.remove();
+    peerLabels.clear();
+    for(const bubble of waveLabels.values())bubble.el.remove();
+    waveLabels.clear();
+  }
   function applyRoom(state,welcome=false){
     ensemble=state;
     Object.assign(parkedSpot,scooterSpot(state.scooter||SCOOTER_START));
     parkedSpot.visible=!state.players.some(p=>activityId(p.seat)==='ride');
     scooterHit.layers.set(parkedSpot.visible?0:1);
     scooterHit.position.set(parkedSpot.x,groundHeight(parkedSpot.x,parkedSpot.z)+.58,parkedSpot.z);scooterHit.rotation.y=parkedSpot.land.yaw;
-    if(state.status!=='online'){pendingSeat=null;shorePending=false;return;}
+    if(state.status!=='online'){pendingSeat=null;shorePending=false;clearVisitors();return;}
     const next=state.players.find(p=>p.id===state.ownId);
     if(!next)return;
     const directory=new Map((state.members||[]).map(m=>[m.id,m]));
@@ -617,6 +640,7 @@ export function createWorld(host,residents,callbacks) {
     if(document.hidden||!onScreen||blocked)return;
     elapsed+=dt;
     const nowMs=room.now();
+    for(const dog of dogs)dog.run(nowMs);
     updateCast(dt,nowMs);
     const walking=move(dt);
     const {x,z}=avatar.position,floor=groundHeight(x,z);
@@ -661,12 +685,17 @@ export function createWorld(host,residents,callbacks) {
     if(running)return;
     running=true;resize();last=performance.now();setCamera(0,true);updateCast(1,room.now());callbacks.onCamera(wide);scanNearby();frame=requestAnimationFrame(tick);
   }
-  function stop(){running=false;cancelAnimationFrame(frame);keys.clear();cancelWalk();hovered=null;pendingSeat=null;afterStand=null;seated=null;doing=null;climbing=null;climbTarget=null;progress=0;localJump=0;stick.right=stick.forward=0;drive.reset();shorePending=false;own=null;if(travelView){({angle,tilt,wide}=travelView);travelView=null;}}
+  function stop(){
+    running=false;cancelAnimationFrame(frame);keys.clear();cancelWalk();clearVisitors();
+    ensemble={status:'offline',players:[],claims:{},ownId:null};own=null;nearest=hovered=spotlit=null;
+    pendingSeat=null;afterStand=null;seated=null;doing=null;climbing=null;climbTarget=null;progress=0;localJump=0;
+    stick.right=stick.forward=0;drive.reset();shorePending=false;outfit(null,'#e58a5f');callbacks.youLabel.textContent='You';
+    if(travelView){({angle,tilt,wide}=travelView);travelView=null;}
+  }
   function setBlocked(value){blocked=value;if(value){keys.clear();stick.right=stick.forward=0;pointerStart=null;hovered=null;}else if(running)last=performance.now();}
   function toggleCamera(){introView=false;wide=!wide;callbacks.onCamera(wide);return wide;}
   return {start,stop,find,takeSeat,takeActivity,stand,kick,jump,
     setStick(right,forward){stick.right=right;stick.forward=forward;},
-    findGuest(id){const root=guests.get(id)?.root;if(!root)return;const dest=approachFor(root.position,avatar.position);if(dest){if(doing||seated){afterStand=()=>go(dest);stand();}else go(dest);}},
     interact:()=>interact(),toggleCamera,setBlocked,applyRoom,wave,
     setBall(b){ballState=b;},correct(p){cancelWalk();shorePending=false;drive.reset();progress=p.progress||0;snap(p);},clearRequest(){pendingSeat=null;shorePending=false;}};
 }

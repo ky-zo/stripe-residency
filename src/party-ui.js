@@ -379,7 +379,7 @@ export function createPartyUI({ residents, onClaim, onRelease, onWave, onInvite,
     }
     updateText(availability, online ? `${free} of ${residents.length} characters free` : connectionDetails[state.status]);
     updateText(selection, current ? `Playing as ${current.shortName}` : ownMember ? `Playing as ${ownMember.name}` : 'Visiting as a guest');
-    updateText(memberLink,member?'Edit your member':'Join as yourself');
+    updateText(memberLink,member?'Edit your guest':'Join as yourself');
     updateText(done, current || ownMember ? 'Done' : 'Continue as visitor');
     const releaseHidden = !current;
     if (release.hidden !== releaseHidden) release.hidden = releaseHidden;

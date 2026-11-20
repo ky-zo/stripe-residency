@@ -14,7 +14,7 @@ const roster = [
     backdrop: '#94c3a9',
     name: 'kyzo',
     shortName: 'kyzo',
-    role: 'CopyCopter maker',
+    role: 'Founder of One',
     bio: 'kyzo built CopyCopter to turn text prompts into videos. That little helicopter is a literal take on the name.',
     prop: 'CopyCopter helicopter',
     source: 'https://www.kyzo.io/',
@@ -30,14 +30,12 @@ const roster = [
     source: 'https://www.tailscan.com/blog/starting-the-journey-with-tailscan',
   },
   {
-    handle: 'dannypostma',
+    handle: 'powpow',
     backdrop: '#90c1d8',
-    name: 'Danny Postma',
-    shortName: 'Danny',
-    role: 'HeadshotPro founder',
-    bio: 'Danny founded the AI photography company HeadshotPro. He also publishes his own photographs, so a little camera belongs in his hands.',
-    prop: 'Pocket camera',
-    source: 'https://www.dannypostma.com/',
+    name: 'PowPow',
+    shortName: 'PowPow',
+    role: 'Island resident',
+    profile: null,
   },
   {
     handle: 'josefbuettgen',
@@ -222,6 +220,10 @@ const roster = [
 ];
 
 export const residents = roster.map((resident) => ({
-  ...resident,
   profile: `https://x.com/${resident.handle}`,
+  ...resident,
 }));
+
+const normalizeName=value=>value.normalize('NFKC').trim().replace(/^@/,'').replace(/\s+/gu,' ').toLowerCase();
+const residentNames=new Map(residents.flatMap(r=>[r.name,r.handle].map(name=>[normalizeName(name),r])));
+export const matchingResident=name=>residentNames.get(normalizeName(name));
