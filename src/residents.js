@@ -1,6 +1,7 @@
 const roster = [
   {
     handle: 'phuctm97',
+    backdrop: '#fabd97',
     name: 'Minh-Phuc Tran',
     shortName: 'Phuc',
     role: 'Hacker Residency host',
@@ -10,6 +11,7 @@ const roster = [
   },
   {
     handle: 'ky__zo',
+    backdrop: '#95c0ab',
     name: 'kyzo',
     shortName: 'kyzo',
     role: 'CopyCopter maker',
@@ -19,6 +21,7 @@ const roster = [
   },
   {
     handle: 'Erwin_AI',
+    backdrop: '#f8c169',
     name: 'Erwin',
     shortName: 'Erwin',
     role: 'Tailscan founder',
@@ -28,6 +31,7 @@ const roster = [
   },
   {
     handle: 'dannypostma',
+    backdrop: '#93bfd1',
     name: 'Danny Postma',
     shortName: 'Danny',
     role: 'HeadshotPro founder',
@@ -37,6 +41,7 @@ const roster = [
   },
   {
     handle: 'josefbuettgen',
+    backdrop: '#f49583',
     name: 'Josef Büttgen',
     shortName: 'Josef',
     role: 'Software developer',
@@ -46,6 +51,7 @@ const roster = [
   },
   {
     handle: 'melanieklenner',
+    backdrop: '#cdadd6',
     name: 'Melanie Klenner',
     shortName: 'Melanie',
     role: 'PoloFlow co-founder',
@@ -56,6 +62,7 @@ const roster = [
   },
   {
     handle: 'ann_nnng',
+    backdrop: '#d3827f',
     name: 'Ann Nguyen',
     shortName: 'Ann',
     role: 'Frontend developer',
@@ -65,6 +72,7 @@ const roster = [
   },
   {
     handle: 'loaibassam',
+    backdrop: '#f7b669',
     name: 'Leo Bassam',
     shortName: 'Leo',
     role: 'Plutio founder',
@@ -74,6 +82,7 @@ const roster = [
   },
   {
     handle: 'sup_nim',
+    backdrop: '#bedbbd',
     name: 'nim',
     shortName: 'nim',
     role: 'Design engineer',
@@ -83,6 +92,7 @@ const roster = [
   },
   {
     handle: 'founderish',
+    backdrop: '#92bdd8',
     name: 'Tomás Stambulsky',
     shortName: 'Tomás',
     role: 'Tutti founder',
@@ -92,6 +102,7 @@ const roster = [
   },
   {
     handle: 'tdinh_me',
+    backdrop: '#fa998c',
     name: 'Tony Dinh',
     shortName: 'Tony',
     role: 'DevUtils maker',
@@ -102,6 +113,7 @@ const roster = [
   },
   {
     handle: 'rameerez',
+    backdrop: '#fcdb97',
     name: 'Javi',
     shortName: 'Javi',
     role: 'Open-source developer',
@@ -111,6 +123,7 @@ const roster = [
   },
   {
     handle: 'FiachraRM',
+    backdrop: '#a0c3c3',
     name: 'Fiachra MacFadden',
     shortName: 'Fiki',
     role: 'Chengyu Calendar designer',
@@ -120,6 +133,7 @@ const roster = [
   },
   {
     handle: 'praneethpike',
+    backdrop: '#d8b6e1',
     name: 'Praneeth Pike',
     shortName: 'Praneeth',
     role: 'Slashspace founder',
@@ -130,6 +144,7 @@ const roster = [
   },
   {
     handle: 'sandrokratz',
+    backdrop: '#a5ac88',
     name: 'Sandro Kratz',
     shortName: 'Sandro',
     role: 'Tutorbase co-founder',
@@ -140,6 +155,7 @@ const roster = [
   },
   {
     handle: 'odd_joel',
+    backdrop: '#faab7f',
     name: 'IndiJo',
     shortName: 'IndiJo',
     role: 'Moshi maker',
@@ -150,6 +166,7 @@ const roster = [
   },
   {
     handle: 'ayysoni',
+    backdrop: '#9dc7e0',
     name: 'Ayush Soni',
     shortName: 'Ayush',
     role: 'Hardware maker',
@@ -160,6 +177,7 @@ const roster = [
   },
   {
     handle: 'yongfook',
+    backdrop: '#c6d39d',
     name: 'Jon Yongfook',
     shortName: 'Jon',
     role: 'Bannerbear founder',
@@ -170,6 +188,7 @@ const roster = [
   },
   {
     handle: 'caitbhri',
+    backdrop: '#abcbcd',
     name: 'Cait Bahari',
     shortName: 'Cait',
     role: 'Stripe residency host',
@@ -180,6 +199,7 @@ const roster = [
   },
   {
     handle: 'neilhanyd',
+    backdrop: '#fbc8a0',
     name: 'Neil Han',
     shortName: 'Neil',
     role: 'Engineer and author',
@@ -190,6 +210,7 @@ const roster = [
   },
   {
     handle: 'jesslozanos',
+    backdrop: '#cdb6ce',
     name: 'Jess Lozano Schmitt',
     shortName: 'Jess',
     role: 'Stripe residency host',

@@ -17,14 +17,26 @@ function contactShadow() {
     new T.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false}));
 }
 
-export function showModel(host,handle) {
+function portraitBackdrop(tone){
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=128;
+  const ctx=canvas.getContext('2d');
+  const light=new T.Color(tone).lerp(new T.Color('#fff0de'),.32);
+  const edge=new T.Color(tone).lerp(new T.Color('#6a776c'),.10);
+  const shade=ctx.createRadialGradient(48,39,3,58,49,103);
+  shade.addColorStop(0,light.getStyle());shade.addColorStop(.77,tone);shade.addColorStop(1,edge.getStyle());
+  ctx.fillStyle=shade;ctx.fillRect(0,0,128,128);
+  const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;return texture;
+}
+
+export function showModel(host,handle,appearance,backdrop) {
   const renderer=new T.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
   renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
   renderer.outputColorSpace=T.SRGBColorSpace;
   renderer.shadowMap.enabled=true;
   renderer.shadowMap.type=T.VSMShadowMap;
   const scene=new T.Scene();
-  scene.background=new T.Color('#e6e8d8');
+  const tone=backdrop||appearance?.shirt||'#c7d3ba';
+  scene.background=portraitBackdrop(tone);
   const camera=new T.PerspectiveCamera(31,1,.1,20);
   scene.add(new T.HemisphereLight('#fff7e8','#c6c3aa',1.75));
   const key=new T.DirectionalLight('#fff2d9',2.1);
@@ -34,11 +46,12 @@ export function showModel(host,handle) {
   key.shadow.radius=7;key.shadow.blurSamples=8;scene.add(key);
   const rim=new T.DirectionalLight('#e4efdc',1.15);
   rim.position.set(2.3,3,-3);scene.add(rim);
-  const figure=createFigure(T,handle);
+  const figure=createFigure(T,appearance?'visitor':handle,{appearance});
   scene.add(figure.root);
   const bounds=new T.Box3().setFromObject(figure.root),center=bounds.getCenter(new T.Vector3());
   const size=bounds.getSize(new T.Vector3());
-  const base=new T.Mesh(new T.CylinderGeometry(.68,.71,.10,64),new T.MeshStandardMaterial({color:'#cccdb7',roughness:.95}));
+  const plinthColor=new T.Color(tone).lerp(new T.Color('#f7eddb'),.49);
+  const base=new T.Mesh(new T.CylinderGeometry(.56,.59,.073,64),new T.MeshStandardMaterial({color:plinthColor,roughness:.93}));
   base.position.y=bounds.min.y-.055;base.receiveShadow=true;scene.add(base);
   const floor=contactShadow();
   floor.rotation.x=-Math.PI/2;floor.position.set(.035,base.position.y-.055,.006);scene.add(floor);
@@ -73,16 +86,16 @@ export function showModel(host,handle) {
     host.removeEventListener('pointerdown',down);host.removeEventListener('pointermove',move);host.removeEventListener('pointerup',up);host.removeEventListener('pointercancel',up);host.removeEventListener('keydown',keyboard);
     base.geometry.dispose();base.material.dispose();floor.geometry.dispose();floor.material.map.dispose();floor.material.dispose();
     // Figure meshes share their geometry and materials with the courtyard and other portraits.
-    key.shadow.dispose();renderer.dispose();renderer.forceContextLoss();host.replaceChildren();
+    scene.background.dispose();key.shadow.dispose();renderer.dispose();renderer.forceContextLoss();host.replaceChildren();
   };
 }
 
-export async function downloadFigure(handle) {
+export async function downloadFigure(handle,appearance) {
   const {GLTFExporter}=await import('three/addons/exporters/GLTFExporter.js');
-  const figure=createFigure(T,handle);
+  const figure=createFigure(T,appearance?'visitor':handle,{appearance});
   figure.animate(0,false,false);
   const binary=await new GLTFExporter().parseAsync(figure.root,{binary:true,onlyVisible:true});
   const url=URL.createObjectURL(new Blob([binary],{type:'model/gltf-binary'}));
-  const link=document.createElement('a');link.href=url;link.download='palm-hours-'+handle+'.glb';link.click();
+  const link=document.createElement('a');link.href=url;link.download='stripe-residency-'+handle.replace(':','-')+'.glb';link.click();
   setTimeout(()=>URL.revokeObjectURL(url),30000);
 }

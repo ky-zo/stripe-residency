@@ -16,9 +16,9 @@ const entries={};
 for(const r of residents){
   const figure=createFigure(T,r.handle);
   const bytes=await new GLTFExporter().parseAsync(figure.root,{binary:true,onlyVisible:true});
-  entries['palm-hours-'+r.handle+'.glb']=new Uint8Array(bytes);
+  entries['stripe-residency-'+r.handle+'.glb']=new Uint8Array(bytes);
 }
-await fs.writeFile('build/island/palm-hours-figures.zip',zipSync(entries,{level:6}));
+await fs.writeFile('build/island/stripe-residency-figures.zip',zipSync(entries,{level:6}));
 await fs.mkdir('dist/server',{recursive:true});
 await fs.copyFile('server/sites.js','dist/server/index.js');
 await fs.mkdir('dist/.openai',{recursive:true});

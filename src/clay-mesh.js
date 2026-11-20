@@ -20,8 +20,9 @@ export function clayStudio(T) {
   const scale = new T.Vector3();
   const euler = new T.Euler();
   const clay = new T.MeshStandardMaterial({
-    vertexColors: true, roughness: 0.76, metalness: 0.015
+    vertexColors: true, roughness: 0.66, metalness: 0
   });
+  const eyeClay=new T.MeshStandardMaterial({vertexColors:true,roughness:.31,metalness:0});
 
   function paint(value) {
     if (value?.isColor) return value;
@@ -111,14 +112,15 @@ export function clayStudio(T) {
       this.surface(color, points, faces);
     }
 
-    surface(color, points, indices, vertexTints) {
+    surface(color, points, indices, vertexTints, vertexNormals) {
       const geo = new T.BufferGeometry();
       geo.setAttribute('position', new T.Float32BufferAttribute(points, 3));
       if (vertexTints) {
         geo.setAttribute('color', new T.Float32BufferAttribute(vertexTints, 3));
       }
-      geo.setIndex(indices);
-      geo.computeVertexNormals();
+      geo.setIndex(ArrayBuffer.isView(indices) ? new T.BufferAttribute(indices, 1) : indices);
+      if(vertexNormals) geo.setAttribute('normal',new T.Float32BufferAttribute(vertexNormals,3));
+      else geo.computeVertexNormals();
       this.piece(geo, vertexTints ? null : color);
       geo.dispose();
     }
@@ -150,6 +152,37 @@ export function clayStudio(T) {
       this.surface(color, points, faces);
     }
 
+    // A tapered elliptical lock follows the curvature of the skull and keeps a sculpted ridge.
+    lock(color,path,width,thickness,taper=.08,steps=11) {
+      const curve=new T.CatmullRomCurve3(path.map(p=>new T.Vector3(...p)),false,'centripetal');
+      const points=[],faces=[],colors=[];
+      const tint=paint(color),sides=9;
+      const outward=new T.Vector3(),across=new T.Vector3(),point=new T.Vector3();
+      for(let i=0;i<=steps;i++) {
+        const t=i/steps,c=curve.getPointAt(t),tangent=curve.getTangentAt(t);
+        outward.set(c.x/.31,(c.y-.015)/.33,c.z/.27).normalize();
+        outward.addScaledVector(tangent,-outward.dot(tangent));
+        if(outward.lengthSq()<.001) outward.set(0,0,1);
+        outward.normalize();
+        across.crossVectors(outward,tangent).normalize();
+        const size=taper+(1-taper)*Math.sin(t*Math.PI)**.61;
+        for(let j=0;j<sides;j++) {
+          const a=j/sides*Math.PI*2;
+          const ridge=Math.sin(a);
+          point.copy(c).addScaledVector(across,Math.cos(a)*width*size)
+            .addScaledVector(outward,ridge*thickness*size);
+          points.push(point.x,point.y,point.z);
+          const sheen=.92+.14*Math.max(0,ridge)*(.8+.2*Math.sin(4*a));
+          colors.push(tint.r*sheen,tint.g*sheen,tint.b*sheen);
+        }
+      }
+      for(let i=0;i<steps;i++) for(let j=0;j<sides;j++) {
+        const a=i*sides+j,b=i*sides+(j+1)%sides;
+        faces.push(a,b,a+sides,b,b+sides,a+sides);
+      }
+      this.surface(color,points,faces,colors);
+    }
+
     finish() {
       const geo = new T.BufferGeometry();
       geo.setAttribute('position', new T.Float32BufferAttribute(this.positions, 3));
@@ -162,7 +195,7 @@ export function clayStudio(T) {
   }
 
   const studio = {
-    Part, clay,
+    Part, clay, eyeClay,
     mix(a, b, amount) { return paint(a).clone().lerp(paint(b), amount); }
   };
   studios.set(T, studio);

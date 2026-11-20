@@ -46,7 +46,7 @@ const connectionDetails = {
   offline: 'Character selection is offline.',
 };
 
-export function createPartyUI({ residents, onClaim, onRelease, onWave, onInvite, onKick, onPicker }) {
+export function createPartyUI({ residents, onClaim, onRelease, onWave, onInvite, onKick, onPicker, onMember, onActivities, paintAvatar }) {
   const play = document.getElementById('play-space');
   const existingActions = play.querySelector('.world-actions');
   const existingBottom = document.getElementById('world-bottom');
@@ -113,7 +113,11 @@ export function createPartyUI({ residents, onClaim, onRelease, onWave, onInvite,
   kick.append(symbol('ball'), element('span', null, 'Kick'));
   kick.setAttribute('aria-label', 'Kick the ball');
   kick.hidden = true;
-  dock.append(identity, wave, kick);
+  const activities = button('party-action party-activities');
+  activities.setAttribute('aria-label','Island activities');activities.title='Island activities';
+  activities.innerHTML=icon('sun');activities.append(element('span',null,'Activities'));
+  activities.addEventListener('click',onActivities);
+  dock.append(identity, wave, activities, kick);
   controls.append(dock, existingBottom);
 
   const picker = element('dialog', 'party-picker');
@@ -162,7 +166,9 @@ export function createPartyUI({ residents, onClaim, onRelease, onWave, onInvite,
   feedback.setAttribute('aria-live', 'polite');
   const release = button('text-btn party-release', 'Release character');
   const done = button('primary compact party-done', 'Continue as visitor');
-  pickerFooter.append(selection, release, done);
+  const memberLink=button('party-member-link','Join as yourself');
+  memberLink.addEventListener('click',()=>{closePicker();onMember();});
+  pickerFooter.append(selection,memberLink, release, done);
   picker.append(header, options, feedback, pickerFooter);
   document.body.append(picker);
 
@@ -333,15 +339,19 @@ export function createPartyUI({ residents, onClaim, onRelease, onWave, onInvite,
     }
     if (room.dataset.connection !== state.status) room.dataset.connection = state.status;
     const current = byHandle.get(ownHandle);
-    if (identity.dataset.handle !== (ownHandle || '')) {
-      identity.dataset.handle = ownHandle || '';
-      updateText(identityLabel, current ? current.shortName : 'Choose character');
-      const label = current ? `Change character, currently ${current.name}` : 'Choose character';
+    const member = state.members?.find(m=>m.id===state.players.find(p=>p.id===state.ownId)?.memberId);
+    const ownMember = !current && member;
+    const identityKey = current?.handle || (ownMember ? JSON.stringify(ownMember) : '');
+    if (identity.dataset.handle !== identityKey) {
+      identity.dataset.handle = identityKey;
+      updateText(identityLabel, current ? current.shortName : ownMember ? ownMember.name : 'Choose character');
+      const label = current || ownMember ? `Change character, currently ${(current||ownMember).name}` : 'Choose character';
       identity.setAttribute('aria-label', label);
       identity.title = label;
-      guestFace.hidden = Boolean(current);
-      portrait.hidden = !current;
+      guestFace.hidden = Boolean(current||ownMember);
+      portrait.hidden = !current&&!ownMember;
       if (current) portrait.src = `/portraits/${current.handle}.webp`;
+      else if(ownMember)paintAvatar(portrait,ownMember.appearance);
       else portrait.removeAttribute('src');
     }
     const waveDisabled = !online;
@@ -368,8 +378,9 @@ export function createPartyUI({ residents, onClaim, onRelease, onWave, onInvite,
       }
     }
     updateText(availability, online ? `${free} of ${residents.length} characters free` : connectionDetails[state.status]);
-    updateText(selection, current ? `Playing as ${current.shortName}` : 'Visiting as a guest');
-    updateText(done, current ? 'Done' : 'Continue as visitor');
+    updateText(selection, current ? `Playing as ${current.shortName}` : ownMember ? `Playing as ${ownMember.name}` : 'Visiting as a guest');
+    updateText(memberLink,member?'Edit your member':'Join as yourself');
+    updateText(done, current || ownMember ? 'Done' : 'Continue as visitor');
     const releaseHidden = !current;
     if (release.hidden !== releaseHidden) release.hidden = releaseHidden;
     const releaseDisabled = !online || Boolean(pending);

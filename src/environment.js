@@ -1,5 +1,6 @@
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { onMat, SEATS, WORK_DESKS, WORK_MATS } from './island-life.js';
+import { onMat, SEATS, WATER_Y, WORK_DESKS, WORK_MATS } from './island-life.js';
+import { addShoreActivities } from './shore-art.js';
 
 const TAU = Math.PI * 2;
 const lerp = (a, b, amount) => a + (b - a) * amount;
@@ -144,11 +145,14 @@ function makeContactShadows(T) {
 }
 
 function shoreline(angle) {
-  return 1 + 0.033 * Math.sin(3 * angle - 0.45) + 0.016 * Math.sin(6 * angle + 1) + 0.012 * Math.sin(9 * angle);
+  const inlet=.136*Math.exp(-Math.pow((angle+1.315)/.26,2));
+  return 1 + 0.033 * Math.sin(3 * angle - 0.45) + 0.016 * Math.sin(6 * angle + 1) + 0.012 * Math.sin(9 * angle) - inlet;
 }
 
 function makeWater(T, root) {
   const material = new T.ShaderMaterial({
+    transparent:true,
+    depthWrite:false,
     uniforms: {
       time: { value: 0 },
       deep: { value: new T.Color('#579aa8') }, lagoon: { value: new T.Color('#6abdb5') },
@@ -173,7 +177,8 @@ function makeWater(T, root) {
       void main() {
         vec2 p = worldXZ;
         float angle = atan(p.y / 8.15, p.x / 11.7);
-        float edge = 1.0 + .033*sin(3.0*angle-.45) + .016*sin(6.0*angle+1.0) + .012*sin(9.0*angle);
+        float bayAngle=(angle+1.315)/.26;
+        float edge = 1.0 + .033*sin(3.0*angle-.45) + .016*sin(6.0*angle+1.0) + .012*sin(9.0*angle) - .136*exp(-bayAngle*bayAngle);
         float radius = length(p / vec2(11.7,8.15)) / edge;
         float shoal = 1.0 - smoothstep(1.12,1.62,radius + .024*sin(p.x*.75));
         float tint = sin(p.x*.24+p.y*.48)*.045 + sin(p.y*.7-p.x*.16)*.025;
@@ -189,7 +194,9 @@ function makeWater(T, root) {
         float foam = (1.0-smoothstep(.002,.011,abs(radius-lap)))*(.22+.55*smoothstep(-.63,.62,sin(angle*8.0+time*.33)));
         colour = mix(colour,sun,min(.9,glints*.39 + beachRipples*.21 + foam));
         colour = mix(colour,horizon,smoothstep(26.0,110.0,length(eyePosition))*.76);
-        gl_FragColor = vec4(colour,1.0);
+        // Clear water at the swimming steps lets the figure's real submerged body show.
+        float cove = 1.0-smoothstep(.52,1.29,length((p-vec2(2.60,-10.55))/vec2(3.35,2.08)));
+        gl_FragColor = vec4(colour,mix(1.0,.53,cove));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
@@ -197,7 +204,12 @@ function makeWater(T, root) {
   const mesh = new T.Mesh(new T.PlaneGeometry(740, 740), material);
   mesh.name = 'Lagoon and shallows';
   mesh.rotation.x = -Math.PI / 2;
-  mesh.position.y = -0.64;
+  mesh.position.y = WATER_Y;
+  const shelf=new T.Mesh(new T.PlaneGeometry(27,23),new T.MeshBasicMaterial({color:'#8ebdb1'}));
+  shelf.name='Shallow sandy seabed';
+  shelf.rotation.x=-Math.PI/2;
+  shelf.position.set(2.60,-2.0,-11.7);
+  root.add(shelf);
   root.add(mesh);
   return t => { material.uniforms.time.value = t; };
 }
@@ -593,6 +605,25 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
     block(details,'#8c9b77',cx,.30,z(1.295),4.95,.10,.077);
     block(details,'#b67e4e',cx,1.11,z(.96),5.19,.16,.77);
     block(details,'#d39d68',cx,1.18,z(.98),5.23,.07,.79);
+    // A small enamel host plaque hangs on the wooden counter.
+    const plaqueX=x(.52),plaqueZ=z(1.332);
+    for(const off of [-.31,.31]) {
+      stick(details,'#a48755',[plaqueX+off,.86,plaqueZ],[plaqueX+off,1.03,plaqueZ-.014],.011);
+    }
+    block(details,'#365646',plaqueX,.705,plaqueZ,.92,.419,.047);
+    block(details,'#f6e7c3',plaqueX,.706,plaqueZ+.024,.886,.384,.023);
+    if(typeof Image!=='undefined'){
+      const logo=new T.TextureLoader().load('/brand/stripe.svg');
+      logo.colorSpace=T.SRGBColorSpace;
+      logo.anisotropy=4;
+      const lettering=new T.Mesh(new T.PlaneGeometry(.63,.2625),new T.MeshBasicMaterial({map:logo,transparent:true,depthWrite:false,toneMapped:false}));
+      lettering.name='Stripe enamel plaque';
+      lettering.position.set(plaqueX,.703,plaqueZ+.039);
+      root.add(lettering);
+    }
+    for(const off of [-.382,.382]){
+      ball(details,'#cba766',plaqueX+off,.71,plaqueZ+.043,.017,.017,.010);
+    }
     for(let i=0;i<3;i++) bowl(x(-1.99+i*.38),1.215,z(1.05),.195,['#5f8a79','#dfaa72','#729b8a'][i]);
     bowl(x(.98),1.215,z(.97),.37,'#a16e42');
     for (let i=0;i<10;i++) {
@@ -733,12 +764,12 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
     }
   }
 
-  function stool(x, z, colour) {
+  function stool(x, z, colour, rise=0) {
     for (const dx of [-.17,.17]) {
-      for (const dz of [-.14,.14]) rod(details,'#927147',[x+dx*1.3,.035,z+dz*1.3],[x+dx,.44,z+dz],.044);
+      for (const dz of [-.14,.14]) rod(details,'#927147',[x+dx*1.3,.035,z+dz*1.3],[x+dx,.44+rise,z+dz],.044);
     }
-    for(const side of [-.17,.17]) rod(details,'#ab8858',[x+side,.20,z-.17],[x+side,.20,z+.17],.028);
-    block(details,colour,x,.451,z,.53,.115,.46);
+    for(const side of [-.17,.17]) rod(details,'#ab8858',[x+side,.20+rise*.5,z-.17],[x+side,.20+rise*.5,z+.17],.028);
+    block(details,colour,x,.451+rise,z,.53,.115,.46);
     shadows.ellipse(x,z,.47,.37,.20);
   }
 
@@ -766,10 +797,11 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
     block(details,'#e4bf89',x-.72,.940,z-.25,.44,.048,.37,0,-.17);
     block(details,mint ? '#ba6f50' : '#748c77',x-.72,.966,z-.25,.45,.020,.38,0,-.17);
     stick(details,'#5f5546',[x-.87,.990,z-.26],[x-.58,.990,z-.16],.014);
-    details.stamp(props.pot,'#efe1b9',x+.88,1.025,z-.23,.115,.22,.115);
-    stick(details,'#597b50',[x+.88,1.10,z-.23],[x+.88,1.32,z-.26],.015);
-    blade(details,[x+.88,1.13,z-.23],.7,.14,.056,.11,.03,'#70926b','#87a466');
-    flower(details,x+.88,1.34,z-.26,.094);
+    const vaseX=x+(mint?.88:1.02),vaseZ=z+(mint?-.23:.34);
+    details.stamp(props.pot,'#efe1b9',vaseX,1.025,vaseZ,.115,.22,.115);
+    stick(details,'#597b50',[vaseX,1.10,vaseZ],[vaseX,1.32,vaseZ-.03],.015);
+    blade(details,[vaseX,1.13,vaseZ],.7,.14,.056,.11,.03,'#70926b','#87a466');
+    flower(details,vaseX,1.34,vaseZ-.03,.094);
     stool(x,z+1.05,mint ? '#6d937a' : '#d1905c');
     stool(x-.75,z-.90,'#a67e51');
     obstacle(x,z,width,depth);
@@ -846,6 +878,7 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
     shadows.ellipse(centre.x,centre.z,1.03,.41,.17);
   }
   WORK_MATS.forEach(beachMat);
+  const setSwimmer=addShoreActivities(T,root,{batch:details,props,block,ball,rod,stick,disc,obstacle,shadows,stool});
 
   function parasol(x, z, h, radius) {
     rod(details,'#865f3d',[x,.08,z],[x,h+.14,z],.060);
@@ -908,11 +941,11 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
   }
   for(const [x,z,size,bloom] of [
     [-10.04,2.50,.91,'#f8dcc0'],[-8.99,3.13,.76,'#e6aa8b'],[-7.43,-5.33,1.01,null],
-    [-2.56,-5.80,.94,'#f4d493'],[.21,-6.25,1.04,null],[1.58,-6.37,.77,'#e6aa79'],
+    [-2.56,-5.80,.94,'#f4d493'],[.21,-6.25,1.04,null],[.91,-6.55,.56,'#e6aa79'],
     [7.23,-4.49,.88,'#f6d49d'],[9.20,-3.05,1.12,null],[9.44,1.90,1.03,'#f0b387'],
     [8.88,3.77,.72,null],[-6.86,5.77,.64,'#f7d7a8'],[5.94,6.10,.61,'#f6e0b4'],
   ]) seaGrape(x,z,size,bloom);
-  bananaPlant(.46,-6.03,1.08);
+  bananaPlant(-1.27,-6.13,1.00);
   bananaPlant(8.62,-4.23,1.43);
   bananaPlant(9.67,2.34,.98);
   for(let i=0;i<68;i++) {
@@ -1001,7 +1034,7 @@ export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
   shadows.finish(root);
   for(const geometry of Object.values(props)) geometry.dispose();
   return {
-    obstacles, seats:SEATS,
+    obstacles, seats:SEATS, setSwimmer,
     update(t) { for (const animate of animated) animate(t); },
   };
 }

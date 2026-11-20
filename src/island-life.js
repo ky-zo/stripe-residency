@@ -29,6 +29,29 @@ export const SEATS = [
   }))),
 ];
 
+export const SWIMMER_INDEX = 4;
+export const WATER_Y = -.64;
+export const SWIM_LANDING = {x:2.05,z:-5.85,yaw:Math.PI};
+
+const sunDeck = {x:-3.92,z:4.12,facing:1.16};
+export const SUNBEDS = [-.99,0,.99].map((across,i)=>({
+  ...onMat(sunDeck,across,0),facing:sunDeck.facing,
+  upright:i===1,colour:['#cb795a','#719789','#778fa8'][i],
+}));
+export const STUDIO_STOOL = {x:7.55,y:.235,z:-2.29,facing:0};
+export const STRETCH_MAT = {x:5.12,z:3.88,facing:-.55};
+
+const loungeLand=(bed)=>({...onMat(bed,0,1.50),yaw:bed.facing+Math.PI});
+export const PLAY_SPOTS = [
+  {id:'lounge',label:'Sunbed',x:SUNBEDS[2].x,z:SUNBEDS[2].z,hitY:.48,land:loungeLand(SUNBEDS[2])},
+  {id:'swim',label:'Swimming cove',x:3.72,z:-6.16,hitY:.8,land:{x:2.88,z:-5.63,yaw:Math.PI}},
+];
+const stations = new Map([
+  [6,{...STUDIO_STOOL,activity:'work',land:{x:8.18,z:-2.82,yaw:-.83}}],
+  [15,{...SUNBEDS[0],activity:'lounge',land:loungeLand(SUNBEDS[0])}],
+  [19,{...SUNBEDS[1],activity:'read',land:loungeLand(SUNBEDS[1])}],
+]);
+
 // Cast order matches the resident directory. Each row follows one curved walk from
 // home, through a control point, to a conversation with the other two in its group.
 const walks = [
@@ -40,23 +63,24 @@ const walks = [
   [1,-1.75,-4.76, 2.57, -1.65,-3.44, -1.34,-2.20],
   [1,.44,-5.52, -.76, .47,-4.02, .33,-2.86],
   [2,6.53,-4.53, -2.45, 5.95,-4.10, 5.91,-3.63],
-  [2,8.80,-1.87, .45, 8.51,-2.69, 7.08,-3.11],
+  [2,8.80,-1.87, .45, 8.47,-3.25, 7.03,-3.49],
   [4,4.47,.07, .84, 4.43,1.03, 3.71,1.43],
-  [3,-5.68,4.40, .29, -5.20,3.88, -4.69,3.19],
+  [3,-5.75,4.12, .29, -5.25,2.73, -5.10,1.76],
   [3,-3.89,1.10, -1.10, -4.26,1.77, -3.98,2.22],
-  [3,-1.59,3.09, .72, -2.24,3.80, -3.08,3.43],
+  [3,-1.59,3.09, .72, -2.13,2.29, -3.13,1.62],
   [1,1.46,-.49, .62, 1.13,-1.23, .53,-1.55],
   [4,1.41,2.45, -1.25, 1.74,1.88, 2.41,1.42],
   [4,5.12,3.88, -.17, 4.52,3.17, 3.58,2.68],
   [5,-3.45,5.36, -.74, -2.72,4.64, -1.63,4.30],
-  [5,-.22,1.21, 2.21, -.66,2.27, -.39,3.43],
+  [5,.16,1.21, 2.21, -.14,2.27, -.39,3.43],
   [5,2.87,5.21, .46, 2.13,4.34, .79,4.12],
   [6,-2.78,.60, 1.27, -2.67,-.09, -2.13,-.81],
   [6,.80,.17, -.82, .42,-.62, -.56,-.82],
   [6,-.95,1.63, -2.55, -1.06,.92, -1.37,.29],
 ];
 
-export const HOME = walks.map(([,x,z,yaw]) => ({x,z,yaw}));
+export const HOME = walks.map(([,x,z,yaw],i) =>
+  i===SWIMMER_INDEX ? {...SWIM_LANDING} : stations.has(i) ? {...stations.get(i).land} : {x,z,yaw});
 
 const conversations = [
   {period:26.8, offset:8.1}, {period:31.7, offset:19.6}, {period:29.2, offset:2.7},
@@ -72,8 +96,9 @@ function seed(index, salt) {
 
 const paths = walks.map(([group,x,z,homeYaw,cx,cz,mx,mz,stool], i) => {
   const {period, offset} = conversations[group];
-  const companions = walks.filter((r,j) => j !== i && r[0] === group);
+  const companions = walks.filter((r,j) => j !== i && r[0] === group && !stations.has(j) && j!==SWIMMER_INDEX);
   const gaze = companions.map(r => Math.atan2(r[6] - mx, r[7] - mz));
+  if(gaze.length===1)gaze.push(gaze[0]+.18);
   const length = Math.hypot(cx-x,cz-z) + Math.hypot(mx-cx,mz-cz);
   const speed = .65 + .25 * seed(i,0);
   const depart = .7 + 5.5 * seed(i,1);
@@ -110,14 +135,23 @@ function inMotion(path, t, returning, seconds) {
   const heading = Math.atan2(a*(cx-fromX)+travel*(toX-cx), a*(cz-fromZ)+travel*(toZ-cz));
   let yaw = turn(atRest(path,seconds,!returning), heading, smooth(t/.19));
   yaw = turn(yaw,atRest(path,seconds,returning),smooth((t-.77)/.23));
-  return {x,z,yaw,walking:true,seated:false};
+  return {x,z,y:0,yaw,walking:true,seated:false,activity:'walk',land:null};
 }
 
-/** Pose for an unclaimed resident at a shared wall-clock time, with no accumulated state. */
+/**
+ * Pose for an unclaimed resident at a shared wall-clock time.
+ * y is the absolute floor / waterline height supplied to the figure's root.
+ * land marks a safe place on the sand for approaching or claiming an activity.
+ */
 export function npcPose(index, serverTimeMs) {
   const path = paths[index];
   if (!path) return null;
   const seconds = Number.isFinite(serverTimeMs) ? serverTimeMs / 1000 : 0;
+  if(index===SWIMMER_INDEX) {
+    return swimPose(seconds,0,2.49,-9.64,.99,.24,14.8,SWIM_LANDING);
+  }
+  const station=stations.get(index);
+  if(station) return {x:station.x,z:station.z,y:station.y??0,yaw:station.facing,walking:false,seated:true,activity:station.activity,land:station.land};
   const clock = ((seconds + path.offset) % path.period + path.period) % path.period;
   if (clock >= path.depart && clock < path.depart + path.outward) {
     return inMotion(path, (clock - path.depart) / path.outward, false, seconds);
@@ -126,7 +160,51 @@ export function npcPose(index, serverTimeMs) {
     return inMotion(path,(clock-path.leave)/path.homeward,true,seconds);
   }
   const home = clock < path.depart || clock >= path.leave + path.homeward;
-  return {x:home ? path.x : path.mx, z:home ? path.z : path.mz, yaw:atRest(path,seconds,home), walking:false, seated:home && path.stool};
+  const x=home ? path.x : path.mx, z=home ? path.z : path.mz, seated=home && path.stool;
+  let activity=seated ? 'sit' : 'idle', yaw=atRest(path,seconds,home);
+  if(index===3){
+    activity='photograph';
+    yaw=(home ? -1.69 : -1.24) + .23*Math.sin(seconds*.44);
+  }else if(index===14 && home){
+    activity='stretch';yaw=STRETCH_MAT.facing;
+  }
+  return {x,z,y:0,yaw,walking:false,seated,activity,land:seated ? {x,z:z+.79,yaw:0} : null};
+}
+
+/** A navigable land origin for a player taking over an NPC, including the swimmer. */
+export function npcLandPose(index, serverTimeMs) {
+  const pose=npcPose(index,serverTimeMs);
+  if(!pose)return null;
+  if(pose.land)return pose.land;
+  const path=paths[index];
+  if(path.stool && Math.abs(pose.x-path.x)<.52 && Math.abs(pose.z-path.z)<.49) {
+    return {x:path.x,z:path.z+.79,yaw:0};
+  }
+  return {x:pose.x,z:pose.z,yaw:pose.yaw};
+}
+
+function swimPose(seconds, offset, cx, cz, rx, rz, period, land) {
+  const phase=(seconds%period)*TAU/period+offset;
+  const x=cx+rx*Math.sin(phase), z=cz+rz*Math.cos(phase);
+  const y=WATER_Y+.020*Math.sin((seconds%4.8)*TAU/2.4+offset);
+  return {x,z,y,yaw:Math.atan2(rx*Math.cos(phase),-rz*Math.sin(phase)),walking:false,seated:false,activity:'swim',land};
+}
+
+/** Shared-clock figure pose while a player is using a leisure spot. */
+export function playPose(id, serverTimeMs, playerId='guest') {
+  if(id==='lounge') {
+    const bed=SUNBEDS[2];
+    return {x:bed.x,z:bed.z,y:0,yaw:bed.facing,walking:false,seated:true,activity:'lounge',land:PLAY_SPOTS[0].land};
+  }
+  if(id!=='swim')return null;
+  let hash=2166136261;
+  const name=String(playerId);
+  for(let i=0;i<name.length;i++) hash=Math.imul(hash^name.charCodeAt(i),16777619);
+  hash=Math.imul(hash^hash>>>16,0x85ebca6b);
+  hash=(hash^hash>>>13)>>>0;
+  const phase=TAU*hash/4294967296, lane=hash%4;
+  const seconds=Number.isFinite(serverTimeMs)?serverTimeMs/1000:0;
+  return swimPose(seconds,phase,2.65+.025*lane,-10.65-.30*lane,1.09,.22,17.6+lane*.9,PLAY_SPOTS[1].land);
 }
 
 /** An eight-panel vinyl beach ball. Its object origin is the centre of the ball. */

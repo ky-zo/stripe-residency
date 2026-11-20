@@ -1,4 +1,6 @@
 import { clayStudio } from './clay-mesh.js';
+import { sculptPortrait } from './portrait-sculpt.js';
+import { groomHair } from './figure-hair.js';
 
 // Wardrobe, silhouettes and facial details come from the residents' profile portraits.
 // Accessories make their projects legible even at courtyard scale.
@@ -15,9 +17,9 @@ const looks = {
   founderish: { skin: '#dbaa89', hair: '#50413a', style: 'fade', top: '#393f49', pants: '#687c7b', outfit: 'tee', beard: 'goatee', smile: 'open', prop: 'flag' },
   tdinh_me: { skin: '#dca579', hair: '#292b2b', style: 'curtains', top: '#526d7c', pants: '#494c4d', outfit: 'buttonDown', prop: 'toolbox' },
   rameerez: { skin: '#d9a680', hair: '#332b2a', style: 'curls', top: '#33383d', pants: '#717b76', outfit: 'tee', beard: 'full', prop: 'ruby', smile: 'open' },
-  fiachrarm: { skin: '#f2c6a4', hair: '#e7c784', style: 'fringe', top: '#e8ac42', pants: '#5e7572', outfit: 'polo', prop: 'calendar', smile: 'open' },
+  fiachrarm: { skin: '#edbb96', hair: '#8e694e', style: 'quiff', top: '#e9ddca', pants: '#4b4c4d', outfit: 'checked', glasses:'amber', prop: 'calendar', smile: 'open' },
   praneethpike: { skin: '#b77f5f', hair: '#302a29', style: 'shaved', top: '#4a4140', pants: '#757465', outfit: 'tee', glasses: 'square', beard: 'short', prop: 'rabbit' },
-  sandrokratz: { skin: '#d9a57c', hair: '#67422d', style: 'quiff', top: '#3e454a', pants: '#677068', outfit: 'bomber', beard: 'shadow', prop: 'carabiner', slim: true },
+  sandrokratz: { skin: '#d9a57c', hair: '#73533c', style: 'quiff', top: '#514940', pants: '#677068', outfit: 'bomber', prop: 'carabiner', slim: true },
   odd_joel: { skin: '#deb393', hair: '#342e2d', style: 'cap', top: '#6889a2', pants: '#625b57', outfit: 'crossbody', glasses: 'softSquare', prop: 'phone', smile: 'open' },
   ayysoni: { skin: '#bf8b69', hair: '#292628', style: 'wings', top: '#e5dfd3', pants: '#575655', outfit: 'stripes', beard: 'goatee', prop: 'board', smile: 'open' },
   yongfook: { skin: '#d2a182', hair: '#34343e', style: 'silverQuiff', top: '#424252', pants: '#656671', outfit: 'coat', beard: 'shadow', prop: 'bear', slim: true },
@@ -45,7 +47,7 @@ const expressions = {
   ann_nnng:[.94,1,.95,.88,-.046], loaibassam:[.91,1.025,1.04,1.04,.013],
   sup_nim:[.97,1,.98,1.06,-.016], founderish:[1.03,.97,.91,.97,-.024],
   tdinh_me:[1.02,.97,.86,1.08,.014], rameerez:[1,.98,.93,1.06,.012],
-  fiachrarm:[.94,.96,1.10,.83,-.018], praneethpike:[1.06,.98,.91,1.12,.016],
+  fiachrarm:[.97,1.03,1,.98,-.018], praneethpike:[1.06,.98,.91,1.12,.016],
   sandrokratz:[.93,1.025,.88,1.05,-.012], odd_joel:[1.02,.97,.78,1.03,.032],
   ayysoni:[1.02,.98,.9,1.08,-.034], yongfook:[.95,1,.86,1.06,.012],
   caitbhri:[.98,.985,1.12,.91,-.012], neilhanyd:[1.04,1.015,.78,1.06,.01],
@@ -82,10 +84,10 @@ function scalpPoint(a, p, lift=0) {
 }
 
 function hairline(a) {
-  return 1.045+(1-Math.cos(a))*.48+Math.abs(Math.sin(a))*.23+Math.sin(a*3)*.035;
+  return .805+(1-Math.cos(a))*.55+Math.abs(Math.sin(a))*.30+Math.sin(a*3)*.035;
 }
 
-function hairCap(part, color, boundary) {
+function hairCap(part, color, boundary, lift=0) {
   const positions = [], indices = [];
   const slices = 48, rings = 15;
   for (let k = 0; k <= rings; k++) {
@@ -93,7 +95,7 @@ function hairCap(part, color, boundary) {
     for (let j = 0; j < slices; j++) {
       const a = j / slices * tau;
       const p = Math.max(.010, t * boundary(a));
-      positions.push(...scalpPoint(a,p));
+      positions.push(...scalpPoint(a,p,lift));
     }
   }
   for (let k = 0; k < rings; k++) {
@@ -106,7 +108,7 @@ function hairCap(part, color, boundary) {
 }
 
 function hairRidges(part,look,mix) {
-  if (['shaved','cap','bucket','curls'].includes(look.style)) return;
+  if (!['knot','combed'].includes(look.style)) return;
   const divided=['long','halfUp','parted','wings','curtains','layered','bangs'].includes(look.style);
   const pulled=look.style==='knot';
   const color=mix(look.hair,'#c9aa88',.073);
@@ -142,13 +144,22 @@ function hairstyle(part, look, mix) {
   const shine = mix(hair, '#aa9584', .10);
   const ridge = mix(hair, '#958575', .045);
   if (style === 'shaved') {
-    hairCap(part, mix(skin, hair, .12), a => .72 + (1 - Math.cos(a)) * .54 + Math.abs(Math.sin(a)) * .23);
-    for (const s of [-1, 1]) {
-      part.oval(mix(skin, hair, .43), .298 * s, .052, -.035, .018, .111, .085, [0, 0, -.08 * s]);
+    const edge=a=>.76+(1-Math.cos(a))*.58+Math.abs(Math.sin(a))*.22;
+    hairCap(part,mix(skin,hair,.70),edge);
+    for(let j=0;j<85;j++) {
+      const a=j*2.39996,t=.12+.84*Math.sqrt((j+.5)/85),p=edge(a)*t;
+      const center=scalpPoint(a,p,.0028);
+      const tip=scalpPoint(a+.043,p-.050,.0031);
+      part.stroke(mix(skin,hair,.56+.30*(j%3)/2),[center,tip],.0032,.2,3,4);
     }
     return;
   }
-  hairCap(part, hair, hairline);
+  const faded=['quiff','silverQuiff','fade'].includes(style)||look.id==='sup_nim';
+  if(faded) {
+    const sides=mix(hair,skin,style==='silverQuiff'?.38:.17);
+    hairCap(part,sides,hairline);
+    hairCap(part,hair,a=>.67+(1-Math.cos(a))*.33+Math.abs(Math.sin(a))*.17,.0065);
+  } else hairCap(part,hair,hairline);
   if (style === 'cap' || style === 'bucket') {
     const capColor = style === 'cap' ? '#a49f90' : '#df9470';
     part.loft(capColor, [[.114,.304,.253],[.13,.334,.282],[.204,.318,.278],[.283,.265,.244],[.328,.16,.147],[.346,.038,.04]]);
@@ -173,114 +184,7 @@ function hairstyle(part, look, mix) {
     return;
   }
 
-  if (style === 'combed') {
-    part.oval(hair,-.026,.242,.111,.212,.058,.109,[-.13,.12,-.12]);
-    part.oval(hair,.077,.228,.127,.127,.052,.092,[-.15,.11,-.19]);
-    for(let j=0;j<4;j++) {
-      const lift=j*.012;
-      part.stroke(ridge,[[-.200,.178+lift,.166],[-.119,.218+lift,.214],
-        [.003,.232+lift,.207],[.108,.241+lift,.143],[.172,.212+lift,.099]],.0065,.20,11);
-    }
-    return;
-  }
-
-  const long = ['long','halfUp','curtains','wings','bangs','layered'].includes(style);
-  if (long || style === 'parted') {
-    if (long) {
-      const ends = ['long','halfUp','bangs','layered'].includes(style) ? -.43 : style === 'wings' ? -.29 : -.185;
-      part.oval(hair,0,(ends+.25)/2,-.139,.312,(.27-ends)/2,.165);
-      for (const s of [-1,1]) {
-        const tucked = style === 'halfUp' || (style==='bangs' && s>0) || (style==='layered' && s<0);
-        part.oval(hair,s*(tucked?.267:.26),(ends+.18)/2,tucked?-.037:.018,
-          tucked?.066:.084,(.21-ends)/2,tucked?.108:.125,[.045,0,s*.06]);
-        const end = [s*(style==='wings'?.34:.265), ends+.035, style==='long'?.105:-.004];
-        part.stroke(ridge, [[s*.17,.241,.153],[s*.247,.114,.177],[s*.28,-.087,.126],end],.018,.25,12);
-        if (style === 'wings') {
-          part.oval(hair,s*.291,-.175,.016,.084,.105,.1, [.1,0,-s*.56]);
-        }
-        if (style === 'layered') {
-          const amber=mix(hair,'#b47b51',.18);
-          for(let j=0;j<2;j++) {
-            const z=(tucked?-.035:.075)-j*.054;
-            part.stroke(j?ridge:amber,[[s*.227,.172,z+.102],[s*.285,.056,z+.074],
-              [s*.284,-.072,z+.085],[s*.26,-.179,z+.099],
-              [s*.294,-.287,z+.077],[s*(.299+j*.033),-.374,z+.022]],j?.031:.021,.14,15,7);
-          }
-          if(s>0) {
-            part.stroke(mix(hair,'#bc835b',.15),[[.225,.165,.135],[.274,.066,.146],
-              [.290,-.040,.146],[.258,-.147,.167],[.267,-.241,.177],[.314,-.292,.155],
-              [.363,-.282,.111]],.037,.13,17,8);
-            part.stroke(amber,[[.268,-.177,.144],[.271,-.251,.146],[.292,-.312,.153],
-              [.343,-.351,.124],[.383,-.335,.089]],.022,.14,13,7);
-          }
-        }
-      }
-      if (style === 'halfUp') {
-        part.oval(hair,0,.02,-.25,.162,.22,.10);
-        part.dot('#88746a',0,-.04,-.33,.025,.025,.016);
-      }
-    }
-    if(style==='bangs') {
-      for(let j=-3;j<=3;j++) {
-        const x=j*.054;
-        const bottom=.104+Math.abs(j)*.009+(j===0?.014:0);
-        const points=facePath([[x*.68,.256],[x*.85,.211],[x,.172],[x+.011*Math.sign(j),bottom]],.024);
-        part.stroke(j%2?ridge:hair,points,.034,.09,12,8);
-      }
-      return;
-    }
-    for (const s of [-1,1]) {
-      const partOffset=style==='layered'?-.035:0;
-      part.oval(hair,s*.128+partOffset,.223,.134,.170,.084,.126,[.02,s*.18,-s*.47]);
-      part.stroke(ridge, [[s*.018,.294,.13],[s*.089,.268,.194],[s*.174,.216,.218],
-        [s*.249,.146,.169]],.014,.22,10);
-      if (style==='parted') {
-        part.oval(hair,s*.190,.138,.183,.077,.101,.048,[-.12,s*.14,-s*.4]);
-      }
-    }
-    return;
-  }
-
-  if (style === 'curls') {
-    for (let row = 0; row < 2; row++) {
-      const count = row ? 8 : 13;
-      for (let j = 0; j < count; j++) {
-        const a = j/count*tau + row*.27;
-        const radius = row ? .143 : .237;
-        const ripples = Math.sin(j*3.81+row)*.011;
-        part.dot(j%4===1?ridge:hair,Math.sin(a)*radius,
-          (row?.289:.191) + Math.cos(a)*.022 + ripples, Math.cos(a)*radius*.82,
-          .092+ripples,.078+Math.cos(j)*.013,.088+ripples,[0,a,.22*Math.sin(j)]);
-      }
-    }
-    part.oval(ridge,.004,.314,-.028,.117,.065,.108);
-    return;
-  }
-
-  if (style === 'swoop' || style === 'fringe') {
-    const blond = style === 'fringe';
-    part.oval(hair,-.015,.207,.164,.240,.107,.116,[.04,.12,-.27]);
-    for (let j = 0; j < 4; j++) {
-      const x = (j-1.5)*.091;
-      part.oval(j===2?ridge:hair,x,.181+x*.21,.192- Math.abs(x)*.23,
-        .121,blond?.086:.092,.095,[.04,.13,-.39]);
-    }
-    part.stroke(shine,[[.182,.253,.128],[.094,.247,.208],[-.03,.207,.259],[-.171,.128,.22]],.009,.15,12);
-    return;
-  }
-
-  const high = style === 'quiff' || style === 'silverQuiff';
-  if (style === 'silverQuiff') {
-    for (const s of [-1,1]) part.oval('#756c72',s*.29,.072,-.023,.031,.098,.10);
-  }
-  part.oval(hair,-.016,high?.244:.218,.119,.229,high?.117:.094,.132,[-.23,.09,-.21]);
-  for (let j = 0; j < 3; j++) {
-    const x = (j - 1) * .097;
-    part.oval(j===1?ridge:hair,x,(high?.253:.215) + (1-j)*.014,
-      .124 - Math.abs(x)*.2,.145,high?.105:.088,.115,[-.25, .10,-.26]);
-  }
-  part.stroke(shine, [[-.205,.17,.160],[-.122,.258,.210],[.013,high?.315:.286,.15],
-    [.138,.269,.075]], .011,.22,12);
+  groomHair(part,look,mix,faceZ);
 }
 
 function facialHair(part, look, mix) {
@@ -405,10 +309,15 @@ function makeHead(part, eyes, look, mix, expression) {
     const outer=look.smile==='open'?.11:.105;
     part.stroke(brows,facePath([[cx-s*.064,.098],[cx-s*.014,.115],
     [cx+s*.033,outer],[cx+s*.055,.089]],.011),.013,.22);
-    const z=faceZ(cx,.025)+.008;
-    eyes.dot('#473631',cx,0,z,.034,.045*expression[2],.024,[0,s*.26,0]);
-    eyes.dot('#30292d',cx+.001,.003,z+.010,.024,.034*expression[2],.019,[0,s*.2,0]);
-    eyes.dot('#fff5db',cx-.010,.015*expression[2],z+.024,.008,.0095,.005);
+    const z=faceZ(cx,.025)+.006,angle=[0,s*.26,0];
+    eyes.oval('#ded0bc',cx,0,z,.047,.032*expression[2],.015,angle);
+    eyes.dot('#544136',cx,.001,z+.011,.029,.028*expression[2],.007,angle);
+    eyes.dot('#2f2c2e',cx,.001,z+.017,.016,.017*expression[2],.004,angle);
+    eyes.dot('#fff3da',cx-.006,.008,z+.021,.0045,.0045,.002,angle);
+    part.stroke(mix(hair,skin,.4),facePath([[cx-s*.043,.026],[cx-s*.023,.048],
+      [cx+s*.004,.055],[cx+s*.029,.046],[cx+s*.043,.028]],.012),.005,.20,9,5);
+    part.stroke(mix(skin,'#a76c58',.27),facePath([[cx-s*.039,.021],[cx-.002,-.002],
+      [cx+s*.032,.011],[cx+s*.042,.023]],.007),.004,.18,8,5);
   }
   facialHair(part,look,mix);
   const nose=mix(skin,'#d58f75',.25);
@@ -510,7 +419,13 @@ function passengerJet(p) {
 }
 
 function makeProp(p, kind) {
-  if(kind==='directory'||kind==='blockchainBook') {
+  if(kind==='reading') {
+    for(const s of [-1,1]) {
+      p.block('#4d8179',s*.054,0,0,.12,.15,.018,[0,s*.37,0]);
+      p.block('#ebe1c6',s*.053,.004,.014,.109,.137,.022,[0,s*.37,0]);
+      for(const y of [-.030,-.012,.009,.030]) p.block('#a49e8b',s*.052,y,.033,.073,.0038,.003,[0,s*.37,0]);
+    }
+  } else if(kind==='directory'||kind==='blockchainBook') {
     bookProp(p,kind);
   } else if(kind==='airplane') {
     passengerJet(p);
@@ -540,7 +455,6 @@ function makeProp(p, kind) {
     }
   } else if (kind==='lens') {
     p.stroke('#397679',[[-.058,-.117,0],[-.031,-.066,0],[.006,-.004,0]],.019,.90);
-    p.oval('#9bd5cc',.033,.046,0,.079,.08,.019);
     ring(p,'#3c9ca0',.033,.046,.004,.08,.082,.014);
     p.stroke('#e4f6dd',[[.005,.071,.020],[.014,.085,.019],[.028,.091,.018]],.006,.32);
   } else if (kind==='camera') {
@@ -555,16 +469,27 @@ function makeProp(p, kind) {
     p.block('#a4a89b',.074,.025,.05,.031,.020,.006);
     p.block('#363b3e',-.005,0,-.049,.134,.086,.007);
   } else if (kind==='fish') {
-    p.oval('#b2dcd4',0,-.003,0,.111,.104,.095);
-    p.oval('#8ecbc6',0,-.031,.013,.103,.074,.085);
-    p.oval('#c4e5d9',0,.078,0,.089,.017,.077);
-    p.oval('#8cc2bd',0,.086,0,.075,.007,.062);
-    p.oval('#c3dccc',0,-.099,0,.072,.012,.059);
-    p.oval('#e78b48',-.01,-.018,.085,.051,.029,.019, [0,0,.14]);
-    p.dot('#d37543',.041,-.015,.081,.026,.026,.012, [0,0,-.3]);
-    p.dot('#473e39',-.038,-.012,.100,.005);
-    p.stroke(paper,[[-.086,.001,.049],[-.086,.033,.048],[-.066,.057,.05]],.005,.50);
-    p.dot('#e7fff0',.059,.033,.079,.009);
+    for(const [y,radius,width,color] of [[.084,.078,.004,'#b2d6cf'],[.049,.097,.0023,'#9ccac4']]) {
+      const circle=Array.from({length:31},(_,j)=>[Math.sin(j/30*tau)*radius,y,Math.cos(j/30*tau)*radius]);
+      p.stroke(color,circle,width,.97,30,6);
+    }
+    p.oval('#aaad92',0,-.082,0,.067,.016,.066);
+    for(const [x,z,r,ink] of [[-.038,.017,.016,'#a89678'],[.023,-.036,.014,'#b6ac91'],
+      [.035,.013,.018,'#a48e77'],[-.005,.031,.009,'#c3ad84']]) p.dot(ink,x,-.070,z,r,r*.58,r*.81);
+    for(const [x,z,h] of [[.046,-.024,.057],[.050,-.006,.044],[-.036,-.032,.032]]) {
+      p.lock('#718f72',[[x,-.073,z],[x-.008,-.066+h*.30,z],[x+.004,-.070+h*.74,z],[x-.005,-.074+h,z]],.006,.003,.19,6);
+    }
+    p.oval('#ed9746',-.014,-.009,.009,.047,.029,.022,[0,0,.15]);
+    p.dot('#d87939',.038,-.005,.005,.030,.023,.010,[0,0,.48]);
+    p.dot('#f1aa4e',.040,-.015,.005,.025,.018,.009,[0,0,-.47]);
+    p.dot('#d97b37',-.007,.017,.007,.020,.013,.006,[0,0,-.22]);
+    for(const s of [-1,1]) {
+      p.dot('#f2ac55',-.003,-.014,.009+s*.019,.022,.011,.004,[0,.15*s,.24]);
+      p.dot('#513f35',-.041,-.003,.009+s*.015,.0055,.006,.004);
+    }
+    p.stroke('#e0f0dd',[[-.086,-.003,.056],[-.092,.020,.050],[-.079,.050,.052]],.0038,.25,9,5);
+    p.dot('#d5e9df',-.064,.014,.025,.0045);
+    p.dot('#c6e4d8',-.068,.031,.023,.006);
   } else if (kind==='mallet') {
     p.stroke('#a2704c',[[-.068,-.119,0],[-.01,.015,0],[.09,.232,0]],.013,.87);
     p.stroke('#695143',[[-.069,-.12,0],[-.057,-.091,0],[-.045,-.063,0]],.017,.9);
@@ -741,7 +666,8 @@ function makeBody(part,look,mix) {
   const {top, outfit} = look;
   const deep=mix(top,'#433b38',.24), edge=mix(top,'#e4d7bc',.22);
   part.loft(look.pants,[[.407,.113,.102],[.424,.178,.129],[.472,.194,.131],[.495,.148,.115]]);
-  part.oval(look.skin,0,.883,0,.093,.079,.087);
+  part.loft(look.skin,[[.843,.109,.095,0,.022],[.878,.107,.10,0,.025],
+    [.926,.098,.102,0,.040],[.959,.093,.108,0,.056],[.981,.102,.108,0,.061]]);
   part.loft(top,shirtLevels);
   part.stroke(deep,shirtPath([[-.131,.462],[-.073,.456],[.008,.456],[.091,.46],[.152,.466]],.003),.005,.3);
   const jackets=['bomber','coat','fieldJacket','denimHood'];
@@ -758,6 +684,9 @@ function makeBody(part,look,mix) {
       part.stroke(under,shirtPath([[-.081,.865],[-.059,.842],[0,.816],[.06,.844],[.084,.866]],.018),.021,.71);
       for (const s of [-1,1]) {
         part.stroke('#ead8ba',shirtPath([[s*.04,.823],[s*.040,.785],[s*.045,.751]],.018),.005,.92);
+        part.stroke('#b3a38b',shirtPath([[s*.106,.724],[s*.114,.686],[s*.146,.679],[s*.161,.718]],.009),.004,.7,8);
+        part.stroke('#aeb1a3',shirtPath([[s*.101,.729],[s*.129,.727],[s*.157,.731]],.010),.006,.78,6);
+        part.dot('#cba879',s*.13,.713,shirtZ(s*.13,.713)+.013,.005,.005,.004);
       }
     }
     if (outfit==='coat') {
@@ -784,8 +713,22 @@ function makeBody(part,look,mix) {
       const rx=a[1]+(b[1]-a[1])*f+.0015,rz=a[2]+(b[2]-a[2])*f+.0015;
       part.loft('#56565a',[[y,rx,rz],[y+.014,rx,rz]]);
     }
+  } else if(outfit==='checked') {
+    const check=mix(top,'#a59182',.45);
+    for(let i=0;i<10;i++) {
+      const y=.477+i*.038;
+      const row=shirtLevels.findIndex(level=>level[0]>=y);
+      const a=shirtLevels[row-1],b=shirtLevels[row],t=(y-a[0])/(b[0]-a[0]);
+      const rx=a[1]+(b[1]-a[1])*t+.002,rz=a[2]+(b[2]-a[2])*t+.002;
+      part.loft(check,[[y,rx,rz],[y+.003,rx,rz]],24);
+    }
+    for(let i=0;i<16;i++) {
+      const a=i/16*tau;
+      const path=shirtLevels.slice(2,-1).map(([y,rx,rz])=>[Math.sin(a)*(rx+.002),y,Math.cos(a)*(rz+.002)]);
+      part.stroke(check,path,.0024,.74,9,4);
+    }
   }
-  if (['polo','blouse','buttonDown','openCollar','silk','drapedCollar'].includes(outfit)) {
+  if (['polo','blouse','buttonDown','checked','openCollar','silk','drapedCollar'].includes(outfit)) {
     const collar=outfit==='openCollar'?mix(top,'#b1b8a4',.18):
       outfit==='drapedCollar'?mix(top,'#82918f',.14):edge;
     for(const s of [-1,1]) {
@@ -799,7 +742,7 @@ function makeBody(part,look,mix) {
     }
     if (outfit!=='blouse') {
       part.stroke(deep,shirtPath([[0,.812],[0,.748],[0,.686]],.006),.005,.8);
-      for(const y of (outfit==='buttonDown'?[.792,.725,.659,.592,.526]:[.78,.721])) {
+      for(const y of (outfit==='buttonDown'||outfit==='checked'?[.792,.725,.659,.592,.526]:[.78,.721])) {
         part.dot(outfit==='buttonDown'?'#c5beaa':deep,0,y,shirtZ(0,y)+.010,.006,.006,.004);
       }
     }
@@ -828,7 +771,7 @@ function makeBody(part,look,mix) {
       part.block('#78a2ad',0,.612,shirtZ(0,.6)+.028,.047,.016,.004);
       part.oval('#e9b584',0,.735,shirtZ(0,.735)+.002,.072,.054,.007);
     } else {
-      part.dot('#c7c9b7',0,.729,shirtZ(0,.729)+.019,.018,.022,.008);
+      part.block('#cbcbbf',0,.729,shirtZ(0,.729)+.014,.024,.038,.009,[0,0,.08]);
     }
   }
   if(['turtleneck','crossbody','fieldJacket'].includes(outfit)) {
@@ -842,13 +785,14 @@ function makeBody(part,look,mix) {
 }
 
 function makeArm(part,side,look,studio) {
-  const {mix,Part}=studio;
-  const jacket=['denimHood','bomber','coat','fieldJacket','buttonDown','stripes','silk','blouse','suit','drapedCollar'].includes(look.outfit);
+  const {mix}=studio;
+  const jacket=['denimHood','bomber','coat','fieldJacket','buttonDown','checked','stripes','silk','blouse','suit','drapedCollar','henley','openCollar'].includes(look.outfit);
   const handX=side*.073;
   if(jacket) {
     part.oval(look.skin,side*.070,-.241,.075,.041,.041,.041,[-.30,0,0]);
     part.loft(look.top,[[-.231,.044,.046,side*.072,.06],[-.215,.055,.052,side*.073,.055],
-      [-.118,.060,.067,side*.057,.017],[-.003,.079,.088,side*.014,.001],[.037,.058,.058]],18);
+      [-.118,.060,.067,side*.057,.017],[-.003,.079,.088,side*.014,.001],[.034,.064,.064],
+      [.051,.041,.040],[.058,.009,.010]],18);
     part.oval(mix(look.top,'#4c4a45',.17),side*.07,-.217,.059,.052,.025,.051,[-.26,0,0]);
     if(look.outfit==='suit') {
       part.oval('#e7e5d9',side*.070,-.231,.064,.048,.017,.048,[-.28,0,0]);
@@ -856,18 +800,13 @@ function makeArm(part,side,look,studio) {
   } else {
     part.oval(look.skin,side*.061,-.183,.043,.049,.105,.049,[-.37,0,side*.05]);
     part.loft(look.top,[[-.131,.063,.068,side*.060,.011],[-.115,.07,.069,side*.057,.009],
-      [-.051,.080,.077,side*.037,.004],[.009,.078,.081,side*.009,0],[.047,.039,.047]],18);
+      [-.051,.080,.077,side*.037,.004],[.009,.078,.081,side*.009,0],[.043,.047,.049],[.054,.013,.013]],18);
     part.oval(mix(look.top,'#52483f',.16),side*.058,-.121,.012,.067,.016,.068);
   }
   part.oval(look.skin,handX,-.260,.089,.051,.064,.055,[-.32,0,side*.05]);
   part.dot(look.skin,handX-side*.034,-.255,.122,.025,.033,.023,[-.12,0,side*.27]);
-  if(side>0 && look.prop) {
-    const accessory = new Part();
-    makeProp(accessory,look.prop);
-    const geo=accessory.finish();
-    const angle=look.prop==='airplane'?[-.58,.13,-.18]:[-.11,-.13,-.08];
-    part.piece(geo,null,handX+.05,-.214,.145,[1,1,1],angle);
-    geo.dispose();
+  if(look.prop) for(let i=0;i<3;i++) {
+    part.dot(look.skin,handX+side*(i-1)*.016,-.284,.115,.012,.022,.018,[-.24,0,side*.05]);
   }
   if(side<0 && ['lanyard','crossbody'].includes(look.outfit)) {
     part.oval(look.outfit==='crossbody'?'#cb796d':'#648399',handX,-.220,.069,.052,.014,.052,[-.3,0,0]);
@@ -890,18 +829,100 @@ function makeLeg(upper,lower,side,look,mix) {
   for(const z of [.049,.074]) lower.stroke(paper,[[-.029,-.209,z],[0,-.204,z+.003],[.029,-.209,z]],.0035,.6,5);
 }
 
-function buildPieces(studio,look,expression) {
+const keepsakePoses={
+  house:[0,.657,.241,1.43,.115],helicopter:[-.015,.672,.246,1.36,.11],lens:[-.061,.695,.235,1.46,.066],
+  camera:[0,.680,.254,1.40,.107],fish:[0,.665,.246,1.49,.115],mallet:[.104,.700,.226,1.60,.060],
+  monitor:[0,.660,.248,1.38,.117],clipboard:[0,.673,.232,1.40,.088],flowers:[0,.684,.255,1.43,.075],
+  flag:[.060,.688,.254,1.50,.063],toolbox:[0,.657,.248,1.44,.115],ruby:[0,.67,.247,1.41,.106],
+  calendar:[0,.664,.239,1.44,.104],rabbit:[0,.652,.248,1.51,.084],carabiner:[.015,.688,.245,1.55,.08],
+  phone:[.065,.699,.233,1.48,.058],board:[0,.678,.244,1.52,.115],bear:[0,.664,.255,1.50,.082],
+  directory:[0,.663,.243,1.57,.101],blockchainBook:[0,.676,.244,1.54,.112],airplane:[0,.685,.261,1.46,.113]
+};
+
+function clearKeepsake(T,kind,library) {
+  if(kind!=='fish'&&kind!=='lens') return null;
+  const key='clear/'+kind;
+  if(!library.has(key)) {
+    const profile=[.003,-.094,.051,-.094,.071,-.083,.091,-.056,.105,-.025,.108,.002,
+      .105,.028,.098,.050,.083,.073,.078,.083,.078,.086];
+    let geometry;
+    if(kind==='fish') {
+      const points=[];
+      for(let j=0;j<profile.length;j+=2) points.push(new T.Vector2(profile[j],profile[j+1]));
+      geometry=new T.LatheGeometry(points,32);
+      geometry.normalizeNormals();
+    } else {
+      geometry=new T.SphereGeometry(1,22,12);
+      geometry.scale(.078,.079,.010);
+      geometry.translate(.033,.046,0);
+    }
+    const material=new T.MeshStandardMaterial({color:kind==='fish'?'#b2d9d6':'#6cbebd',
+      roughness:.19,metalness:.05,transparent:true,opacity:kind==='fish'?.21:.38,depthWrite:false,
+      side:T.DoubleSide,forceSinglePass:true});
+    library.set(key,{geometry,material});
+  }
+  const {geometry,material}=library.get(key);
+  const mesh=new T.Mesh(geometry,material);
+  const [x,y,z,size]=keepsakePoses[kind];
+  mesh.name=kind==='fish'?'Glass fishbowl':'Magnifying lens';
+  mesh.position.set(x,y,z);
+  mesh.scale.setScalar(size);
+  mesh.rotation.set(-.055,-.08,-.035);
+  return mesh;
+}
+
+function dressedBody(studio,look) {
+  const part=new studio.Part();
+  makeBody(part,look,studio.mix);
+  const bare=part.finish();
+  if(!look.prop) return {body:bare,bare};
+  const [x,y,z,size]=keepsakePoses[look.prop];
+  const item=new studio.Part();makeProp(item,look.prop);
+  const geo=item.finish();
+  const angle=look.prop==='airplane'?[-.56,.13,-.16]:[-.055,-.08,-.035];
+  part.piece(geo,null,x,y,z,[size,size,size],angle);
+  geo.dispose();
+  return {body:part.finish(),bare};
+}
+
+function figureHead(studio,look,expression,id) {
   const {Part,mix}=studio;
-  const body=new Part(), head=new Part(), eyes=new Part();
-  makeBody(body,look,mix);
-  makeHead(head,eyes,look,mix,expression);
-  const limbs=[-1,1].map(side=>{
+  const head=new Part(),eyes=new Part();
+  if(sculptPortrait(head,eyes,id,look,studio)) {
+    hairstyle(head,look,mix);
+    hairRidges(head,look,mix);
+    if(look.jewelry==='studs') for (const s of [-1,1]) head.dot('#ece5d3',s*.316,-.061,.047,.014,.014,.012);
+    if(look.jewelry==='hoops') for (const s of [-1,1]) ring(head,'#d9ad6b',s*.316,-.076,.058,.019,.030,.005,s*.12);
+  } else {
+    makeHead(head,eyes,look,mix,expression);
+  }
+  return {head:head.finish(),eyes:eyes.finish()};
+}
+
+function figureLimbs(studio,look) {
+  const {Part,mix}=studio;
+  return [-1,1].map(side=>{
     const arm=new Part(),thigh=new Part(),shin=new Part();
     makeArm(arm,side,look,studio);
     makeLeg(thigh,shin,side,look,mix);
     return {arm:arm.finish(),thigh:thigh.finish(),shin:shin.finish()};
   });
-  return {body:body.finish(),head:head.finish(),eyes:eyes.finish(),limbs};
+}
+
+function buildPieces(studio,look,expression,id) {
+  return {...dressedBody(studio,look),...figureHead(studio,look,expression,id),limbs:figureLimbs(studio,look)};
+}
+
+const guestHair={short:'swept',wavy:'parted',long:'layered',buzz:'shaved'};
+const activities=new Set(['lounge','swim','read','work','stretch','photograph']);
+const swatch=(value,fallback)=>typeof value==='string'&&/^#[\da-f]{6}$/i.test(value)?value.toLowerCase():fallback;
+
+function customPieces(studio,library,look,expression) {
+  const h='custom/head/'+[look.skin,look.hair,look.style].join('/');
+  const c='custom/clothes/'+[look.skin,look.top].join('/');
+  if(!library.has(h)) library.set(h,figureHead(studio,look,expression,'visitor'));
+  if(!library.has(c)) library.set(c,{...dressedBody(studio,look),limbs:figureLimbs(studio,look)});
+  return {...library.get(h),...library.get(c)};
 }
 
 function greetingPalm(studio,skin) {
@@ -952,26 +973,35 @@ function guestPieces(T,studio,pieces,color) {
     geometry.boundingSphere=source.boundingSphere;
     return geometry;
   }
+  const body=recolor(pieces.body);
   return {
     ...pieces,
-    body:recolor(pieces.body),
+    body,bare:body,
     head:recolor(pieces.head),
     limbs:pieces.limbs.map(limb=>({...limb,arm:recolor(limb.arm)}))
   };
 }
 
 /** A reusable clay collectible. The origin is between the soles and forward is +Z. */
-export function createFigure(T,handle='visitor',{guestColor}={}) {
+export function createFigure(T,handle='visitor',{guestColor,appearance}={}) {
   const requested=String(handle).replace(/^@/,'').toLowerCase();
   const id=Object.hasOwn(looks,requested)?requested:'visitor';
-  const look=looks[id];
+  let look={...looks[id],id};
   const expression=expressions[id];
   const studio=clayStudio(T);
   if(!perStudio.has(studio)) perStudio.set(studio,new Map());
   const library=perStudio.get(studio);
-  if(!library.has(id)) library.set(id,buildPieces(studio,look,expression));
-  let pieces=library.get(id);
-  if(id==='visitor' && typeof guestColor==='string' && /^#[\da-f]{6}$/i.test(guestColor)) {
+  let pieces;
+  if(id==='visitor' && appearance && typeof appearance==='object') {
+    look={...look,skin:swatch(appearance.skin,look.skin),hair:swatch(appearance.hair,look.hair),
+      top:swatch(appearance.shirt,swatch(guestColor,look.top)),
+      style:Object.hasOwn(guestHair,appearance.hairStyle)?guestHair[appearance.hairStyle]:'swept'};
+    pieces=customPieces(studio,library,look,expression);
+  } else {
+    if(!library.has(id)) library.set(id,buildPieces(studio,look,expression,id));
+    pieces=library.get(id);
+  }
+  if(id==='visitor' && !appearance && typeof guestColor==='string' && /^#[\da-f]{6}$/i.test(guestColor)) {
     const color=guestColor.toLowerCase();
     const key='guest'+color;
     if(!library.has(key)) library.set(key,guestPieces(T,studio,pieces,color));
@@ -992,48 +1022,134 @@ export function createFigure(T,handle='visitor',{guestColor}={}) {
   };
   const torso=mesh(pieces.body,pose);
   if(look.slim) torso.scale.x=.95;
+  const clearProp=clearKeepsake(T,look.prop,library);
+  if(clearProp) torso.add(clearProp);
   const head=mesh(pieces.head,pose,0,1.214,0);
   head.name='Head';
   head.scale.set(expression[0],expression[1],1);
   const eyes=mesh(pieces.eyes,head,0,.025,0);
+  eyes.material=studio.eyeClay;
   const limbs=pieces.limbs.map((piece,i)=>{
     const side=i*2-1;
     const arm=mesh(piece.arm,pose,side*(look.slim?.199:.210),.817,0);
     const thigh=mesh(piece.thigh,pose,side*.102,.50,0);
     const shin=mesh(piece.shin,thigh,0,-.205,0);
-    return {arm,thigh,shin,side};
+    return {arm,thigh,shin,side,armDirection:new T.Vector3(side*.073,-.26,.089).normalize()};
   });
   const hash=Array.from(id).reduce((sum,c)=>sum+c.charCodeAt(0)*.149,0);
-  let palm=null;
+  const aim=new T.Vector3(),rotation=new T.Quaternion();
+  const signature=keepsakePoses[look.prop];
+  const contextProps=new Map();
+  let palm=null,lastActivity='';
+  function aimHand(limb,x,y,z,weight=1) {
+    aim.set(x-limb.arm.position.x,y-limb.arm.position.y,z-limb.arm.position.z).normalize();
+    rotation.setFromUnitVectors(limb.armDirection,aim);
+    limb.arm.quaternion.slerp(rotation,weight);
+  }
+  function changeActivity(activity) {
+    if(activity===lastActivity) return;
+    lastActivity=activity;
+    torso.geometry=activity?pieces.bare:pieces.body;
+    if(clearProp) clearProp.visible=!activity;
+    for(const item of contextProps.values()) item.visible=false;
+    const prop=activity==='read'?'reading':activity==='photograph'?'camera':null;
+    if(!prop) return;
+    let item=contextProps.get(prop);
+    if(!item) {
+      const key='activity-prop/'+prop;
+      if(!library.has(key)) {
+        const drawing=new studio.Part();makeProp(drawing,prop);library.set(key,drawing.finish());
+      }
+      item=mesh(library.get(key),pose);item.name='Activity '+prop;contextProps.set(prop,item);
+    }
+    item.visible=true;
+    const reading=prop==='reading';
+    item.position.set(reading?0:.025,reading?.687:.982,reading?.255:.265);
+    item.rotation.set(reading?.91:-.09,reading?Math.PI:0,reading?0:-.05);
+    item.scale.setScalar(reading?1.42:1.22);
+  }
   let walkWeight=0,seatWeight=0,previousTime;
-  function animate(time=0,walking=false,seated=false,wave=0) {
+  function animate(time=0,walking=false,seated=false,wave=0,activity='') {
+    activity=activities.has(activity)?activity:'';
+    changeActivity(activity);
+    const sitting=seated||activity==='read'||activity==='work'||activity==='lounge';
     const delta=previousTime===undefined?1:Math.max(0,Math.min(.16,time-previousTime));
     previousTime=time;
     const ease=1-Math.exp(-delta*15);
-    const targetWalk=seated?0:Math.min(1,Math.max(0,Number(walking)||0));
+    const targetWalk=sitting?0:Math.min(1,Math.max(0,Number(walking)||0));
     walkWeight+=(targetWalk-walkWeight)*ease;
-    seatWeight+=(Number(Boolean(seated))-seatWeight)*ease;
+    seatWeight+=(Number(Boolean(sitting))-seatWeight)*ease;
     const greeting=Math.max(0,Math.min(1,Number(wave)||0));
     const shake=Math.sin(time*14+hash);
     const reach=Math.cos(time*6.4+hash);
     const step=Math.sin(time*8.8+hash),breath=Math.sin(time*2+hash);
     pose.position.y=.004*(1+breath)+Math.abs(step)*.032*walkWeight-.015*seatWeight;
+    pose.position.z=0;
     pose.rotation.x=.045*walkWeight+.041*seatWeight;
+    pose.rotation.y=0;
     pose.rotation.z=step*.024*walkWeight+.044*greeting;
     head.rotation.y=Math.sin(time*.69+hash)*(.041+.038*walkWeight);
     head.rotation.x=.013*breath+.096*seatWeight;
     head.rotation.z=expression[4]+.011*Math.sin(time*.82+hash)-(.048+.015*shake)*greeting;
+    if(activity==='lounge') {
+      pose.rotation.x=-.88+.016*breath;
+      pose.position.y=.455-.5*Math.cos(pose.rotation.x);
+      pose.position.z=-.5*Math.sin(pose.rotation.x);
+      head.rotation.x=.46+.025*breath;
+    } else if(activity==='swim') {
+      pose.rotation.x=1.05+.045*Math.sin(time*2.2+hash);
+      pose.position.y=-.346+.035*Math.sin(time*2.2+hash);
+      pose.position.z=-.76;
+      pose.rotation.z=.11*Math.sin(time*2.2+hash);
+      head.rotation.x=-.75+.06*breath;head.rotation.y=.16*Math.sin(time*2.2+hash);
+    } else if(activity==='read') {
+      pose.rotation.x=-.12;pose.position.z=.064;pose.position.y=-.034;
+      head.rotation.x=.28+.025*breath;
+    } else if(activity==='work') {
+      head.rotation.x=.20+.045*Math.sin(time*2.9+hash);
+    } else if(activity==='stretch') {
+      pose.rotation.z=-.12-.11*Math.sin(time*.9+hash);
+      head.rotation.z-=.095;
+    } else if(activity==='photograph') {
+      head.rotation.x=.103+.045*Math.sin(time*1.4+hash);
+      head.rotation.z-=.07;
+    }
     const blink=(time+hash)%(4.2+(hash%1.5));
     eyes.scale.y=blink<.17?.11+.89*Math.min(1,Math.abs(blink-.085)/.065):1;
-    for(const {arm,thigh,shin,side} of limbs) {
+    for(const limb of limbs) {
+      const {arm,thigh,shin,side}=limb;
       const stride=step*side;
       thigh.rotation.x=-stride*.48*walkWeight-1.30*seatWeight;
+      thigh.rotation.z=0;
       shin.rotation.x=Math.max(0,stride)*.42*walkWeight+1.30*seatWeight;
       arm.rotation.x=stride*.39*walkWeight-.043+.021*breath-.94*seatWeight;
       arm.rotation.y=0;
       arm.rotation.z=side*(.06+.037*walkWeight+.061*seatWeight);
       arm.scale.y=1;
       if(seatWeight>.02) arm.rotation.x+=Math.sin(time*4.4+side)*.033*seatWeight;
+      if(!activity && signature) {
+        const [x,y,z,,spread]=signature;
+        aimHand(limb,x+side*spread,y-.039,z+.020,.97-walkWeight*.18);
+      } else if(activity==='read') {
+        aimHand(limb,side*.111,.657,.247);
+      } else if(activity==='work') {
+        arm.scale.y=1.24;
+        aimHand(limb,side*.145,.744+.014*Math.sin(time*7.2+side),.33);
+      } else if(activity==='photograph') {
+        aimHand(limb,.018+side*.106,.951+.014*Math.sin(time*1.4+hash),.228);
+      } else if(activity==='lounge') {
+        thigh.rotation.x=-.57;shin.rotation.x=.12;
+        aimHand(limb,side*.20,.593,.119);
+      } else if(activity==='stretch') {
+        thigh.rotation.z=side*.14;
+        arm.scale.y=1.25;
+        aimHand(limb,side*.20-.145,1.12,.04);
+      } else if(activity==='swim') {
+        const stroke=Math.sin(time*2.2+hash+side*1.07),kick=Math.sin(time*5.3+hash)*side;
+        thigh.rotation.x=kick*.25;shin.rotation.x=.15+Math.max(0,-kick)*.38;
+        const recovery=Math.max(0,Math.cos(time*2.2+hash+side*1.07));
+        aimHand(limb,side*(.33+.18*(1+stroke)/2),.89+.24*stroke,.065-.23*recovery);
+      }
       if(side<0 && greeting>0) {
         // Trace a broad arc around the shoulder while keeping the open palm raised.
         const waveYaw=.13+.51*shake,waveRoll=-2.48+.25*shake;

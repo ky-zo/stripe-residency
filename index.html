@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#faf8f1">
-    <meta name="description" content="Walk through a tiny Balinese maker residency, meet twenty-one clay residents, and take a seat by the sea.">
-    <title>Palm Hours · A Bali maker residency</title>
+    <meta name="description" content="Join Stripe Residency online. Make a clay avatar, meet the residents and explore a seaside warung together in Bali.">
+    <title>Stripe Residency online · Bali</title>
     <link rel="icon" href="/sun.svg" type="image/svg+xml">
     <link rel="preload" href="/fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/fonts/instrument-serif-italic.woff2" as="font" type="font/woff2" crossorigin>
@@ -16,7 +16,7 @@
     <a class="skip" href="#residents">Skip to residents</a>
     <header class="mast">
       <div class="frame mast-inner">
-        <a class="wordmark" href="#island" aria-label="Palm Hours home"><i data-icon="sunmark"></i><span>Palm Hours</span></a>
+        <a class="wordmark" href="#island" aria-label="Stripe Residency online home"><img class="stripe-mark" src="/brand/stripe.svg" alt="Stripe"><span>Residency online</span></a>
         <nav aria-label="Main navigation">
           <a id="nav-island" class="nav-link active" href="#island">The island</a>
           <a id="nav-residents" class="nav-link" href="#residents">Residents</a>
@@ -28,14 +28,16 @@
       </div>
     </header>
     <main class="frame">
-      <section id="island" class="stage" tabindex="-1" aria-label="Palm Hours island">
+      <section id="island" class="stage" tabindex="-1" aria-label="Stripe Residency online island">
         <div class="postcard" id="postcard">
           <img class="cover" src="/art/courtyard.webp" alt="A miniature terracotta-roofed warung among coconut palms on the turquoise Balinese coast." fetchpriority="high">
           <div class="postcard-copy">
-            <p class="eyebrow hero-kicker"><span class="rule"></span>A maker residency</p>
-            <h1>Palm <em>Hours.</em></h1>
-            <p class="intro">Twenty-one makers and a seaside warung. Come find your friends under the palms.</p>
-            <button type="button" id="enter" class="primary enter"><i data-icon="walk"></i><span>Enter the courtyard</span></button>
+            <h1 aria-label="Stripe Residency online">Residency <em>online.</em></h1>
+            <p class="intro">A seaside warung, a swimming cove, and a place to build together in Bali.</p>
+            <div class="postcard-actions">
+              <button type="button" id="enter" class="primary enter"><i data-icon="walk"></i><span>Enter the courtyard</span></button>
+              <button type="button" id="join-member" class="join-link">Join as yourself <span aria-hidden="true">↗</span></button>
+            </div>
           </div>
           <div class="postcard-location"><i data-icon="pin"></i>Bali, Indonesia</div>
         </div>
@@ -82,9 +84,10 @@
         <div class="profile-copy">
           <p class="eyebrow" id="resident-role"></p>
           <h2 id="resident-name"></h2>
-          <a id="resident-handle" class="profile-handle" target="_blank" rel="noopener noreferrer"></a>
+          <div id="resident-links" class="resident-links"><a id="resident-handle" class="profile-handle" target="_blank" rel="noopener noreferrer"></a><a id="resident-photo" class="profile-handle" target="_blank" rel="noopener noreferrer">Photo reference ↗</a></div>
           <p id="resident-bio" class="bio"></p>
           <div class="keepsake"><i data-icon="sparkle"></i><div><small>Island keepsake</small><strong id="resident-prop"></strong></div></div>
+          <p id="resident-activity" class="resident-activity" hidden></p>
           <div class="profile-actions"><button type="button" class="primary compact" id="claim-profile"><i data-icon="walk"></i>Play as resident</button><button type="button" class="outline-btn" id="find-resident"><i data-icon="pin"></i>Find in courtyard</button><a id="resident-source" class="source" target="_blank" rel="noopener noreferrer">Field note</a></div>
           <p id="claim-status" class="download-status" role="status" hidden></p>
           <button type="button" class="download text-btn" id="download-model" hidden><i data-icon="download"></i>Download figure (.glb)</button>
@@ -92,12 +95,33 @@
         </div>
       </div>
     </dialog>
+    <dialog id="member-dialog" class="member-dialog" aria-labelledby="member-title">
+      <button type="button" class="round-btn modal-close" id="member-close" aria-label="Close member editor"><i data-icon="close"></i></button>
+      <form id="member-form">
+        <div class="member-intro">
+          <div class="member-figure" id="member-preview" role="img" aria-label="Your custom clay figure"></div>
+          <div><h2 id="member-title" tabindex="-1">Join the residency</h2><p>Your figure joins the resident list. Come back in this browser to play as yourself.</p></div>
+        </div>
+        <div class="member-fields">
+          <label class="member-field" for="member-name">Your name<input id="member-name" name="name" maxlength="32" autocomplete="given-name" placeholder="Your name" required></label>
+          <label class="member-field" for="member-note">Building <span>(optional)</span><input id="member-note" name="note" maxlength="100" placeholder="What are you working on?"></label>
+          <div id="member-options"></div>
+          <p id="member-feedback" class="member-feedback" role="status"></p>
+        </div>
+        <div class="member-footer"><button type="button" id="member-remove" class="text-btn" hidden>Remove my member</button><button id="member-submit" class="primary compact" type="submit">Join the island</button></div>
+      </form>
+    </dialog>
     <dialog id="help-dialog" class="help-dialog" aria-labelledby="help-title">
       <button class="round-btn modal-close" aria-label="Close controls" id="close-help" type="button"><i data-icon="close"></i></button>
       <h2 id="help-title">Around the island</h2>
+      <div id="activity-list" class="activity-list">
+        <button type="button" data-activity="swim"><i data-icon="island"></i>Take a swim</button>
+        <button type="button" data-activity="lounge"><i data-icon="sun"></i>Lounge on the sunbed</button>
+        <button type="button" data-activity="desk"><i data-icon="coffee"></i>Work at a table</button>
+      </div>
       <p>Tap a patch of ground to walk there, or use <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or the arrow keys. Drag the scene to look around.</p>
-      <p>Tap a resident to meet them, or press <kbd>E</kbd> nearby. Choose a character to play as them. Friends on your invite link share this island.</p>
-      <p>Press <kbd>Space</kbd> to wave, kick the striped ball, or take a seat together for a 25-minute focus session.</p>
+      <p>Tap a resident to meet them, or press <kbd>E</kbd> nearby. Choose a resident or join as yourself. Friends on your invite link share this island.</p>
+      <p>Press <kbd>Space</kbd> to wave. Tap the beach float to take a dip, a sunbed to lounge, or a worktable to start a 25-minute focus session.</p>
     </dialog>
     <script type="module" src="/src/main.js"></script>
   </body>

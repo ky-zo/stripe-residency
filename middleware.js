@@ -19,6 +19,12 @@ export default async function middleware(request) {
   if (url.pathname === '/api/invite') {
     return Response.json({path:'/join/'+invitation}, {headers:privateHeaders});
   }
+  if (url.pathname === '/palm-hours-figures.zip') {
+    return rewrite(new URL('/stripe-residency-figures.zip',url),{headers:privateHeaders});
+  }
+  if (url.pathname === '/api/members') {
+    return fetch('https://' + roomHost + '/api/members', {headers:{Cookie:'__Host-palm_hours='+invitation},cache:'no-store'});
+  }
   if (url.pathname === '/api/connection') {
     if (!process.env.ROOM_SIGNING_KEY) return new Response('Island is opening.', {status:503,headers:privateHeaders});
     const pass = await issueRoomPass(url.origin, process.env.ROOM_SIGNING_KEY);
