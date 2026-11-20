@@ -9,7 +9,7 @@
     <link rel="icon" href="/sun.svg" type="image/svg+xml">
     <link rel="preload" href="/fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/fonts/instrument-serif-italic.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="/art/courtyard.webp" as="image">
+    <link rel="preload" href="/art/island.webp" as="image">
     <link rel="stylesheet" href="/src/style.css">
   </head>
   <body>
@@ -30,19 +30,19 @@
     <main class="frame">
       <section id="island" class="stage" tabindex="-1" aria-label="Stripe Residency online island">
         <div class="postcard" id="postcard">
-          <img class="cover" src="/art/courtyard.webp" alt="A miniature terracotta-roofed warung among coconut palms on the turquoise Balinese coast." fetchpriority="high">
+          <img class="cover" src="/art/island.webp" alt="A miniature terracotta-roofed warung among coconut palms on the turquoise Balinese coast." fetchpriority="high">
           <div class="postcard-copy">
             <h1 aria-label="Stripe Residency online">Residency <em>online.</em></h1>
             <p class="intro">A seaside warung, a swimming cove, and a place to build together in Bali.</p>
             <div class="postcard-actions">
-              <button type="button" id="enter" class="primary enter"><i data-icon="walk"></i><span>Enter the courtyard</span></button>
+              <button type="button" id="enter" class="primary enter"><i data-icon="walk"></i><span>Enter the island</span></button>
               <button type="button" id="join-member" class="join-link">Join as yourself <span aria-hidden="true">↗</span></button>
             </div>
           </div>
           <div class="postcard-location"><i data-icon="pin"></i>Bali, Indonesia</div>
         </div>
         <div id="play-space" class="play-space" hidden>
-          <div id="world-host" class="world-host" tabindex="0" aria-label="Walkable three-dimensional courtyard. Tap the ground to walk and drag to look around. Use WASD or arrow keys to move, Space to jump, Q to wave and E to interact."></div>
+          <div id="world-host" class="world-host" tabindex="0" aria-label="Walkable three-dimensional island. Tap the ground to walk and drag to look around. Use WASD or arrow keys to move, Space to jump, Q to wave and E to interact."></div>
           <div class="world-top">
             <button class="world-control" id="leave" type="button"><i data-icon="island"></i><span>Island home</span></button>
             <div class="world-actions">
@@ -72,6 +72,7 @@
           <div class="section-titles"><i class="roster-flower" data-icon="flower"></i><h2 id="roster-title">The residents</h2></div>
           <button class="roster-toggle" type="button" id="all" aria-controls="resident-list" aria-expanded="false"><i data-icon="grid"></i><span>View all residents</span></button>
         </div>
+        <p class="credits"><span>Built by <a href="https://x.com/ky__zo" target="_blank" rel="noopener">@ky__zo</a></span><span class="credits-sep" aria-hidden="true">·</span><a href="https://getone.one" target="_blank" rel="noopener">Get One to run your agents from anywhere <span class="credits-arrow" aria-hidden="true">↗</span></a></p>
         <button type="button" class="hud-scroll hud-prev" aria-label="Previous residents" hidden><i data-icon="chevron"></i></button>
         <button type="button" class="hud-scroll hud-next" aria-label="More residents" hidden><i data-icon="chevron"></i></button>
         <div id="resident-list" class="resident-list" aria-label="Resident portraits"></div>
@@ -93,7 +94,7 @@
           <p id="resident-bio" class="bio"></p>
           <div class="keepsake"><i data-icon="sparkle"></i><div><small>Island keepsake</small><strong id="resident-prop"></strong></div></div>
           <p id="resident-activity" class="resident-activity" hidden></p>
-          <div class="profile-actions"><button type="button" class="primary compact" id="claim-profile"><i data-icon="walk"></i>Play as resident</button><button type="button" class="outline-btn" id="find-resident"><i data-icon="pin"></i>Find in courtyard</button><a id="resident-source" class="source" target="_blank" rel="noopener noreferrer">Field note</a></div>
+          <div class="profile-actions"><button type="button" class="primary compact" id="claim-profile"><i data-icon="walk"></i>Play as resident</button><button type="button" class="outline-btn" id="find-resident"><i data-icon="pin"></i>Find on the island</button><a id="resident-source" class="source" target="_blank" rel="noopener noreferrer">Field note</a></div>
           <p id="claim-status" class="download-status" role="status" hidden></p>
           <button type="button" class="download text-btn" id="download-model" hidden><i data-icon="download"></i>Download figure (.glb)</button>
           <p class="download-status" id="download-status" role="status" hidden></p>

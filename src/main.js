@@ -355,7 +355,7 @@ async function enterWorld(findHandle=null){
   inWorld=true;worldReady=false;pendingFind=findHandle;postcard.hidden=true;play.hidden=false;activeNav('island');
   room.open();updateParty();expandRoster(false);list.scrollLeft=0;
   window.scrollTo({top:0,behavior:motion});
-  if(!world)notice('Opening the courtyard…',30000);
+  if(!world)notice('Opening the island…',30000);
   try{
     const w=await getWorld();
     if(ticket!==entryRevision||!inWorld)return;

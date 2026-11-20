@@ -109,7 +109,7 @@ export function createRoom(events) {
   function open(){if(wanted)return;wanted=true;tries=0;connect();}
   function close(){
     wanted=false;attempt++;guestError('You left the island.');guest=null;preferredHandle=null;clearTimeout(retry);clearTimeout(admissionTimer);clearInterval(heartbeat);const old=socket;socket=null;
-    if(old)try{old.close(1000,'Left the courtyard');}catch{}
+    if(old)try{old.close(1000,'Left the island');}catch{}
     status('offline');
   }
   function trigger(type,extra={}){

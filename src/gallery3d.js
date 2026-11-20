@@ -85,7 +85,7 @@ export function showModel(host,handle,appearance,backdrop) {
     cancelAnimationFrame(frame);resizeObserver.disconnect();
     host.removeEventListener('pointerdown',down);host.removeEventListener('pointermove',move);host.removeEventListener('pointerup',up);host.removeEventListener('pointercancel',up);host.removeEventListener('keydown',keyboard);
     base.geometry.dispose();base.material.dispose();floor.geometry.dispose();floor.material.map.dispose();floor.material.dispose();
-    // Figure meshes share their geometry and materials with the courtyard and other portraits.
+    // Figure meshes share their geometry and materials with the island and other portraits.
     scene.background.dispose();key.shadow.dispose();renderer.dispose();renderer.forceContextLoss();host.replaceChildren();
   };
 }

@@ -214,7 +214,7 @@ function makeWater(T, root) {
 
 export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
   const root = new T.Group();
-  root.name = 'Palm Hours courtyard';
+  root.name = 'Stripe Residency island';
   scene.add(root);
   const random = randomStream(950441);
   const pick = list => list[Math.floor(random() * list.length)];

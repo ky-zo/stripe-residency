@@ -3,7 +3,7 @@ import { sculptPortrait, eyeHeight, faceRadius, faceZ } from './portrait-sculpt.
 import { groomHair } from './figure-hair.js';
 
 // Wardrobe, silhouettes and facial details come from the residents' profile portraits.
-// Accessories make their projects legible even at courtyard scale.
+// Accessories make their projects legible even at island scale.
 const looks = {
   phuctm97: { skin: '#edb68d', hair: '#211c25', style: 'swoop', top: '#59769b', pants: '#354453', outfit: 'denimHood', glasses: 'square', prop: 'house' },
   ky__zo: { skin: '#d6a078', hair: '#684d3b', style: 'parted', top: '#373642', pants: '#807b70', outfit: 'tee', prop: 'helicopter' },

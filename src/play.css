@@ -11,6 +11,7 @@ body.playing .roster{position:fixed;z-index:12;top:max(.9rem,env(safe-area-inset
  background:#fff9eced;box-shadow:0 3px 17px #2644382b;backdrop-filter:blur(13px);-webkit-backdrop-filter:blur(13px)}
 body.playing .roster.folded{width:auto}
 body.playing .section-heading{flex:none;margin:0;gap:0}
+body.playing .credits{display:none}
 body.playing .section-titles{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 body.playing .roster-toggle{flex-direction:column;justify-content:center;gap:.12rem;min-height:2.75rem;min-width:3.65rem;padding:.1rem .3rem;background:transparent;border:0;border-radius:.7rem;font-size:.75rem}
 body.playing .roster-toggle svg{width:1.02rem;height:1.02rem}
