@@ -44,7 +44,7 @@ h1,h2,p{margin:0}
 h1,h2{font-family:var(--serif);font-weight:400}
 h1{font-size:clamp(5.8rem,7.7vw,9.2rem);letter-spacing:-.075em;line-height:.86;margin:1.1rem 0 1.25rem;color:#28382b}
 h1 em{display:block;font-weight:400;letter-spacing:-.055em;padding-right:.08em}
-.intro{max-width:18rem;font-size:clamp(1rem,1.16vw,1.19rem);line-height:1.45;letter-spacing:-.022em;color:#3f4e3b}
+.intro{max-width:18rem;font-size:clamp(1rem,1.16vw,1.19rem);line-height:1.45;letter-spacing:-.022em;color:#563a27}
 .primary{display:inline-flex;align-items:center;justify-content:center;gap:.67rem;min-height:3.2rem;padding:.7rem 1.32rem;border:1px solid #253c2b;border-radius:3rem;background:#293e2e;color:#fffbee;font-weight:600;font-size:.94rem;line-height:1.25;transition:background .18s,transform .18s;box-shadow:0 2px 4px #243d2920}
 .primary:hover{background:#3c553c;transform:translateY(-1px)}
 .primary:active{transform:translateY(1px)}
@@ -155,3 +155,9 @@ html:has(dialog[open]){overflow:hidden}
 .peer-label{pointer-events:auto;border:1px solid #f7f0d982;cursor:pointer}
 .peer-label.offscreen{background:#fff9ebf0;border-color:#52684944;color:#29402d}
 .peer-label.offscreen:before{width:.46rem;height:.46rem;border-color:#50624b50}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:560px){
+  .mast-inner{height:2.85rem}
+  .play-space{height:calc(100svh - 3.2rem);min-height:13rem}
+  .profile-dialog{max-height:95svh;overflow:auto}
+  .profile-art{min-height:15rem}
+}

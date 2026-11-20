@@ -12,7 +12,7 @@ const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function createWorld(host,residents,callbacks) {
   const renderer=new T.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
-  const mobile=matchMedia('(max-width: 650px)').matches;
+  const mobile=matchMedia('(max-width: 650px), (pointer: coarse) and (max-width: 1024px)').matches;
   renderer.setPixelRatio(Math.min(devicePixelRatio,mobile?1.4:1.55));
   renderer.outputColorSpace=T.SRGBColorSpace;
   renderer.shadowMap.enabled=true;
@@ -22,7 +22,7 @@ export function createWorld(host,residents,callbacks) {
   host.replaceChildren(renderer.domElement);
   const scene=new T.Scene();
   const camera=new T.PerspectiveCamera(40,1,.1,150);
-  const environment=buildEnvironment(T,scene);
+  const environment=buildEnvironment(T,scene,{shadowSize:mobile?1024:1536});
   const ray=new T.Raycaster(),pointer=new T.Vector2(),ground=new T.Plane(new T.Vector3(0,1,0),0);
   const hitLayer=new T.Group(), hitObjects=[];
   const hitMaterial=new T.MeshBasicMaterial({visible:false});

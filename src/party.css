@@ -212,3 +212,11 @@
   .party-play .world-top #leave { width: 2.2rem; justify-content: center; }
   .party-choice-name { font-size: .84rem; }
 }
+@media (pointer:coarse) {
+  .party-action, .party-invite, .party-done, .party-release,
+  .party-play .world-control, .party-controls #seat,
+  .focus-actions button, .roster-toggle { min-height: 2.75rem; }
+  .party-play .world-actions .world-control, .party-picker-close,
+  .profile-dialog .modal-close { width: 2.75rem; height: 2.75rem; }
+  .peer-label::after { content: ''; position: absolute; inset: -.4rem -.15rem; }
+}

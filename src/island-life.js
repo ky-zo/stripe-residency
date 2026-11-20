@@ -51,6 +51,9 @@ const walks = [
   [5,-3.45,5.36, -.74, -2.72,4.64, -1.63,4.30],
   [5,-.22,1.21, 2.21, -.66,2.27, -.39,3.43],
   [5,2.87,5.21, .46, 2.13,4.34, .79,4.12],
+  [6,-2.78,.60, 1.27, -2.67,-.09, -2.13,-.81],
+  [6,.80,.17, -.82, .42,-.62, -.56,-.82],
+  [6,-.95,1.63, -2.55, -1.06,.92, -1.37,.29],
 ];
 
 export const HOME = walks.map(([,x,z,yaw]) => ({x,z,yaw}));
@@ -58,6 +61,7 @@ export const HOME = walks.map(([,x,z,yaw]) => ({x,z,yaw}));
 const conversations = [
   {period:26.8, offset:8.1}, {period:31.7, offset:19.6}, {period:29.2, offset:2.7},
   {period:34.3, offset:11.8}, {period:27.6, offset:24.2}, {period:32.1, offset:15.1},
+  {period:30.9, offset:5.5},
 ];
 
 function seed(index, salt) {

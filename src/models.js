@@ -21,6 +21,9 @@ const looks = {
   odd_joel: { skin: '#deb393', hair: '#342e2d', style: 'cap', top: '#6889a2', pants: '#625b57', outfit: 'crossbody', glasses: 'softSquare', prop: 'phone', smile: 'open' },
   ayysoni: { skin: '#bf8b69', hair: '#292628', style: 'wings', top: '#e5dfd3', pants: '#575655', outfit: 'stripes', beard: 'goatee', prop: 'board', smile: 'open' },
   yongfook: { skin: '#d2a182', hair: '#34343e', style: 'silverQuiff', top: '#424252', pants: '#656671', outfit: 'coat', beard: 'shadow', prop: 'bear', slim: true },
+  caitbhri: { skin: '#e2b297', hair: '#392d2c', style: 'bangs', top: '#ede8d8', pants: '#768275', outfit: 'tee', jewelry: 'studs', prop: 'directory', slim: true },
+  neilhanyd: { skin: '#e6ad90', hair: '#322e30', style: 'combed', top: '#354455', pants: '#46515b', outfit: 'suit', glasses: 'thinSquare', prop: 'blockchainBook' },
+  jesslozanos: { skin: '#ddb091', hair: '#654737', style: 'layered', top: '#343f43', pants: '#67747d', outfit: 'drapedCollar', jewelry: 'hoops', smile: 'crooked', prop: 'airplane', slim: true },
   visitor: { skin: '#c58d69', hair: '#3b302c', style: 'bucket', top: '#86a996', pants: '#536558', outfit: 'fieldJacket', prop: null },
 };
 
@@ -45,6 +48,8 @@ const expressions = {
   fiachrarm:[.94,.96,1.10,.83,-.018], praneethpike:[1.06,.98,.91,1.12,.016],
   sandrokratz:[.93,1.025,.88,1.05,-.012], odd_joel:[1.02,.97,.78,1.03,.032],
   ayysoni:[1.02,.98,.9,1.08,-.034], yongfook:[.95,1,.86,1.06,.012],
+  caitbhri:[.98,.985,1.12,.91,-.012], neilhanyd:[1.04,1.015,.78,1.06,.01],
+  jesslozanos:[.94,1.015,.90,.92,-.065],
   visitor:[1,1,1,1,0]
 };
 
@@ -102,7 +107,7 @@ function hairCap(part, color, boundary) {
 
 function hairRidges(part,look,mix) {
   if (['shaved','cap','bucket','curls'].includes(look.style)) return;
-  const divided=['long','halfUp','parted','wings','curtains'].includes(look.style);
+  const divided=['long','halfUp','parted','wings','curtains','layered','bangs'].includes(look.style);
   const pulled=look.style==='knot';
   const color=mix(look.hair,'#c9aa88',.073);
   const shadow=mix(look.hair,'#241e22',.25);
@@ -168,13 +173,24 @@ function hairstyle(part, look, mix) {
     return;
   }
 
-  const long = ['long','halfUp','curtains','wings'].includes(style);
+  if (style === 'combed') {
+    part.oval(hair,-.026,.242,.111,.212,.058,.109,[-.13,.12,-.12]);
+    part.oval(hair,.077,.228,.127,.127,.052,.092,[-.15,.11,-.19]);
+    for(let j=0;j<4;j++) {
+      const lift=j*.012;
+      part.stroke(ridge,[[-.200,.178+lift,.166],[-.119,.218+lift,.214],
+        [.003,.232+lift,.207],[.108,.241+lift,.143],[.172,.212+lift,.099]],.0065,.20,11);
+    }
+    return;
+  }
+
+  const long = ['long','halfUp','curtains','wings','bangs','layered'].includes(style);
   if (long || style === 'parted') {
     if (long) {
-      const ends = style === 'long' || style === 'halfUp' ? -.43 : style === 'wings' ? -.29 : -.185;
+      const ends = ['long','halfUp','bangs','layered'].includes(style) ? -.43 : style === 'wings' ? -.29 : -.185;
       part.oval(hair,0,(ends+.25)/2,-.139,.312,(.27-ends)/2,.165);
       for (const s of [-1,1]) {
-        const tucked = style === 'halfUp';
+        const tucked = style === 'halfUp' || (style==='bangs' && s>0) || (style==='layered' && s<0);
         part.oval(hair,s*(tucked?.267:.26),(ends+.18)/2,tucked?-.037:.018,
           tucked?.066:.084,(.21-ends)/2,tucked?.108:.125,[.045,0,s*.06]);
         const end = [s*(style==='wings'?.34:.265), ends+.035, style==='long'?.105:-.004];
@@ -182,14 +198,40 @@ function hairstyle(part, look, mix) {
         if (style === 'wings') {
           part.oval(hair,s*.291,-.175,.016,.084,.105,.1, [.1,0,-s*.56]);
         }
+        if (style === 'layered') {
+          const amber=mix(hair,'#b47b51',.18);
+          for(let j=0;j<2;j++) {
+            const z=(tucked?-.035:.075)-j*.054;
+            part.stroke(j?ridge:amber,[[s*.227,.172,z+.102],[s*.285,.056,z+.074],
+              [s*.284,-.072,z+.085],[s*.26,-.179,z+.099],
+              [s*.294,-.287,z+.077],[s*(.299+j*.033),-.374,z+.022]],j?.031:.021,.14,15,7);
+          }
+          if(s>0) {
+            part.stroke(mix(hair,'#bc835b',.15),[[.225,.165,.135],[.274,.066,.146],
+              [.290,-.040,.146],[.258,-.147,.167],[.267,-.241,.177],[.314,-.292,.155],
+              [.363,-.282,.111]],.037,.13,17,8);
+            part.stroke(amber,[[.268,-.177,.144],[.271,-.251,.146],[.292,-.312,.153],
+              [.343,-.351,.124],[.383,-.335,.089]],.022,.14,13,7);
+          }
+        }
       }
       if (style === 'halfUp') {
         part.oval(hair,0,.02,-.25,.162,.22,.10);
         part.dot('#88746a',0,-.04,-.33,.025,.025,.016);
       }
     }
+    if(style==='bangs') {
+      for(let j=-3;j<=3;j++) {
+        const x=j*.054;
+        const bottom=.104+Math.abs(j)*.009+(j===0?.014:0);
+        const points=facePath([[x*.68,.256],[x*.85,.211],[x,.172],[x+.011*Math.sign(j),bottom]],.024);
+        part.stroke(j%2?ridge:hair,points,.034,.09,12,8);
+      }
+      return;
+    }
     for (const s of [-1,1]) {
-      part.oval(hair,s*.128,.223,.134,.170,.084,.126,[.02,s*.18,-s*.47]);
+      const partOffset=style==='layered'?-.035:0;
+      part.oval(hair,s*.128+partOffset,.223,.134,.170,.084,.126,[.02,s*.18,-s*.47]);
       part.stroke(ridge, [[s*.018,.294,.13],[s*.089,.268,.194],[s*.174,.216,.218],
         [s*.249,.146,.169]],.014,.22,10);
       if (style==='parted') {
@@ -280,21 +322,26 @@ function facialHair(part, look, mix) {
 function glasses(part, style) {
   if (!style) return;
   const wire = style === 'wire';
+  const thin = wire || style==='thinSquare';
+  const square = style==='square' || style==='thinSquare';
   const color = wire ? '#767477' : '#343639';
   for (const s of [-1,1]) {
     const points=[];
     for (let k=0;k<=20;k++) {
       const t=k/20*tau, cs=Math.cos(t), sn=Math.sin(t);
-      const power=wire?1:style==='square'?.48:.68;
+      const power=wire?1:square?.48:.68;
       const x=s*.123 + .095 * Math.sign(cs)*Math.abs(cs)**power;
       const y=.031 + (wire?.078:.064) * Math.sign(sn)*Math.abs(sn)**power;
       points.push([x,y,faceZ(x,y)+.025]);
     }
-    part.stroke(color,points,wire?.007:.0105,1,32,6);
+    part.stroke(color,points,thin?.0065:.0105,1,32,6);
+    if(style==='thinSquare') {
+      part.stroke(color,facePath([[s*.033,.077],[s*.089,.096],[s*.173,.094],[s*.211,.075]],.026),.008,.75);
+    }
     part.stroke(color,[[s*.211,.058,faceZ(.211,.058)+.025],
-      [s*.268,.06,.145],[s*.306,.069,.044],[s*.31,.045,-.014]],wire?.0065:.009,1);
+      [s*.268,.06,.145],[s*.306,.069,.044],[s*.31,.045,-.014]],thin?.0065:.009,1);
   }
-  part.stroke(color,facePath([[-.027,.047],[0,.06],[.027,.047]],.029),wire?.0065:.009,1);
+  part.stroke(color,facePath([[-.027,.047],[0,.06],[.027,.047]],.029),thin?.0065:.009,1);
 }
 
 function openSmile(part, lip) {
@@ -379,6 +426,12 @@ function makeHead(part, eyes, look, mix, expression) {
   hairstyle(part,look,mix);
   hairRidges(part,look,mix);
   glasses(part,look.glasses);
+  if(look.jewelry==='studs') {
+    for (const s of [-1,1]) part.dot('#ece5d3',s*.325,-.055,.057,.014,.014,.012);
+  }
+  if(look.jewelry==='hoops') {
+    for (const s of [-1,1]) ring(part,'#d9ad6b',s*.322,-.073,.065,.019,.030,.005,s*.12);
+  }
 }
 
 function ring(part, color, x, y, z, rx, ry, line, tilt=0) {
@@ -391,8 +444,77 @@ function ring(part, color, x, y, z, rx, ry, line, tilt=0) {
   part.stroke(color,points,line,1,28,7);
 }
 
+function bookProp(p,kind) {
+  const directory=kind==='directory';
+  const cover=directory?'#eec24d':'#346f76';
+  const spine=directory?'#d5a13b':'#2a5863';
+  const width=directory?.152:.178,height=directory?.188:.209;
+  p.block(cover,0,0,-.032,width,height,.015);
+  p.block('#e5d6aa',.001,0,0,width-.007,height-.013,.060);
+  p.block(cover,0,0,.032,width,height,.016);
+  p.block(spine,-width/2+.007,0,0,.021,height,.078);
+  if(directory) {
+    p.stroke('#574e37',[[-.040,.040,.043],[-.026,.055,.044],[.006,.061,.044],
+      [.030,.051,.044],[.040,.040,.043]],.008,.8,10);
+    for(const x of [-.036,.036]) p.block('#574e37',x,.036,.045,.019,.018,.009,[0,0,x>0?-.32:.32]);
+    for(const y of [-.021,-.039]) p.block('#776537',.002,y,.043,.073,.006,.004);
+    for(const [i,tint] of ['#e68e62','#88a28a','#a4a6a3'].entries()) {
+      p.block(tint,width/2, .042-i*.033,0,.013,.019,.030);
+    }
+  } else {
+    for(const [x,y] of [[-.039,.027],[.012,.054],[.044,.006]]) {
+      p.stroke('#b1d4bb',[[x-.015,y,.044],[x,y+.009,.044],[x+.015,y,.044],[x,y-.010,.044],[x-.015,y,.044]],.004,.90,8,5);
+      p.stroke('#b1d4bb',[[x-.015,y,.044],[x-.014,y-.019,.044],[x,y-.026,.044],[x+.014,y-.018,.044],[x+.015,y,.044]],.004,.9,8,5);
+      p.block('#b1d4bb',x,y-.017,.045,.004,.016,.004);
+    }
+    p.stroke('#d7b674',[[-.023,.028,.044],[-.011,.035,.044],[.005,.043,.044]],.0035,1,4);
+    p.stroke('#d7b674',[[.025,.040,.044],[.032,.030,.044],[.038,.017,.044]],.0035,1,4);
+    p.block('#e4dab8',.010,-.053,.042,.094,.007,.004);
+    p.block('#a6c1b2',.008,-.068,.042,.061,.005,.004);
+  }
+}
+
+function airplaneWing(p,color,corners,thickness=.009) {
+  const signedArea=corners.reduce((sum,[x,z],i)=>{
+    const next=corners[(i+1)%corners.length];
+    return sum+x*next[1]-z*next[0];
+  },0);
+  const outline=signedArea<0?corners:corners.slice().reverse();
+  const points=[],faces=[],n=outline.length;
+  for (const y of [-thickness/2,thickness/2]) {
+    for(const [x,z] of outline) points.push(x,y,z);
+  }
+  for(let i=1;i<n-1;i++) faces.push(0,i+1,i,n,n+i,n+i+1);
+  for(let i=0;i<n;i++) {
+    const j=(i+1)%n;
+    faces.push(i,j,n+i,j,n+j,n+i);
+  }
+  p.surface(color,points,faces);
+}
+
+function passengerJet(p) {
+  const white='#f2ebd8',blue='#6988a0',trim='#c57862';
+  p.oval(white,0,.003,0,.149,.027,.031);
+  p.oval(blue,-.103,.013,.006,.036,.015,.024,[0,0,-.10]);
+  for(const s of [-1,1]) {
+    airplaneWing(p,'#d6d7ca',[[-.044,s*.015],[.016,s*.014],[.091,s*.130],
+      [.068,s*.136],[.030,s*.111]]);
+    airplaneWing(p,blue,[[.072,s*.012],[.111,s*.012],[.137,s*.063],[.118,s*.068]],.006);
+    p.oval('#dadaca',.018,-.017,s*.062,.035,.015,.015);
+    p.dot('#697473',-.013,-.017,s*.062,.006,.010,.010);
+    for(const x of [-.06,-.033,-.006,.022,.047]) p.dot('#647c88',x,.009,s*.028,.005,.005,.003);
+  }
+  p.surface(trim,[.069,.020,0,.114,.020,0,.132,.075,0,.107,.072,0],[0,1,2,0,2,3]);
+  p.surface(trim,[.069,.020,-.002,.114,.020,-.002,.132,.075,-.002,.107,.072,-.002],[0,2,1,0,3,2]);
+  p.stroke(trim,[[.112,.02,0],[.122,.047,0],[.131,.074,0]],.004,.8,5);
+}
+
 function makeProp(p, kind) {
-  if (kind==='house') {
+  if(kind==='directory'||kind==='blockchainBook') {
+    bookProp(p,kind);
+  } else if(kind==='airplane') {
+    passengerJet(p);
+  } else if (kind==='house') {
     p.block('#e2b780',0,0,0,.201,.152,.146);
     for (const s of [-1,1]) {
       p.block('#bd6048',s*.059,.095,0,.145,.028,.184,[0,0,-s*.46]);
@@ -643,6 +765,18 @@ function makeBody(part,look,mix) {
         part.oval(top,s*.104,.863,-.024,.049,.096,.090,[.14,0,-s*.41]);
       }
     }
+  } else if(outfit==='suit') {
+    const shirt='#e9e9de',tie='#555e69',lapel=mix(top,'#729099',.16);
+    shirtPatch(part,shirt,[[-.084,.862],[-.028,.694],[0,.653],[.084,.862],[.068,.880],[-.067,.880]],.010);
+    shirtPatch(part,tie,[[-.008,.844],[-.017,.704],[0,.684],[.019,.705],[.007,.844]],.017);
+    shirtPatch(part,tie,[[-.019,.857],[0,.830],[.019,.857],[.012,.868],[-.012,.868]],.020);
+    for(const s of [-1,1]) {
+      shirtPatch(part,lapel,[[s*.100,.867],[s*.171,.835],[s*.114,.798],
+        [s*.150,.783],[s*.016,.636],[s*.052,.759]],.013);
+      shirtPatch(part,shirt,[[s*.019,.854],[s*.055,.807],[s*.084,.860],[s*.069,.879]],.017);
+    }
+    part.dot('#59606a',.013,.613,shirtZ(.013,.613)+.011,.009,.009,.005);
+    part.stroke(lapel,shirtPath([[.093,.744],[.118,.747],[.145,.750]],.008),.004,.90);
   } else if (outfit==='stripes') {
     for(const y of [.527,.579,.636,.693,.748,.803]) {
       const row=shirtLevels.findIndex(level=>level[0]>=y);
@@ -651,10 +785,12 @@ function makeBody(part,look,mix) {
       part.loft('#56565a',[[y,rx,rz],[y+.014,rx,rz]]);
     }
   }
-  if (['polo','blouse','buttonDown','openCollar','silk'].includes(outfit)) {
-    const collar=outfit==='openCollar'?mix(top,'#b1b8a4',.18):edge;
+  if (['polo','blouse','buttonDown','openCollar','silk','drapedCollar'].includes(outfit)) {
+    const collar=outfit==='openCollar'?mix(top,'#b1b8a4',.18):
+      outfit==='drapedCollar'?mix(top,'#82918f',.14):edge;
     for(const s of [-1,1]) {
-      const outline=[[s*.022,.825],[s*.085,.882],[s*.151,.848],[s*.089,.783]];
+      const low=outfit==='drapedCollar'?.760:.783;
+      const outline=[[s*.022,.825],[s*.085,.882],[s*.151,.848],[s*.089,low]];
       if(s<0) outline.reverse();
       shirtPatch(part,collar,outline,.012);
     }
@@ -667,13 +803,16 @@ function makeBody(part,look,mix) {
         part.dot(outfit==='buttonDown'?'#c5beaa':deep,0,y,shirtZ(0,y)+.010,.006,.006,.004);
       }
     }
+    if(outfit==='drapedCollar') {
+      part.dot('#727c7c',.012,.776,shirtZ(.012,.776)+.014,.013,.013,.006);
+    }
     if(outfit==='polo'||outfit==='buttonDown') {
       part.stroke(edge,shirtPath([[.074,.730],[.096,.685],[.127,.685],[.149,.728]],.005),.004,.66,7);
       if(outfit==='polo') part.block('#54686a',.112,.716,shirtZ(.112,.716)+.006,.036,.018,.008,[0,.39,0]);
     }
   } else if (outfit==='turtleneck') {
     part.loft(top,[[.853,.116,.094],[.86,.125,.101],[.911,.105,.088],[.928,.094,.081]]);
-  } else if (!jackets.includes(outfit)) {
+  } else if (!jackets.includes(outfit) && outfit!=='suit') {
     part.stroke(deep,shirtPath([[-.105,.869],[-.068,.846],[0,.838],[.070,.847],[.104,.869]],.009),.009,.76);
   }
   if(outfit==='henley') {
@@ -704,13 +843,16 @@ function makeBody(part,look,mix) {
 
 function makeArm(part,side,look,studio) {
   const {mix,Part}=studio;
-  const jacket=['denimHood','bomber','coat','fieldJacket','buttonDown','stripes','silk','blouse'].includes(look.outfit);
+  const jacket=['denimHood','bomber','coat','fieldJacket','buttonDown','stripes','silk','blouse','suit','drapedCollar'].includes(look.outfit);
   const handX=side*.073;
   if(jacket) {
     part.oval(look.skin,side*.070,-.241,.075,.041,.041,.041,[-.30,0,0]);
     part.loft(look.top,[[-.231,.044,.046,side*.072,.06],[-.215,.055,.052,side*.073,.055],
       [-.118,.060,.067,side*.057,.017],[-.003,.079,.088,side*.014,.001],[.037,.058,.058]],18);
     part.oval(mix(look.top,'#4c4a45',.17),side*.07,-.217,.059,.052,.025,.051,[-.26,0,0]);
+    if(look.outfit==='suit') {
+      part.oval('#e7e5d9',side*.070,-.231,.064,.048,.017,.048,[-.28,0,0]);
+    }
   } else {
     part.oval(look.skin,side*.061,-.183,.043,.049,.105,.049,[-.37,0,side*.05]);
     part.loft(look.top,[[-.131,.063,.068,side*.060,.011],[-.115,.07,.069,side*.057,.009],
@@ -723,7 +865,8 @@ function makeArm(part,side,look,studio) {
     const accessory = new Part();
     makeProp(accessory,look.prop);
     const geo=accessory.finish();
-    part.piece(geo,null,handX+.05,-.214,.145,[1,1,1],[-.11,-.13,-.08]);
+    const angle=look.prop==='airplane'?[-.58,.13,-.18]:[-.11,-.13,-.08];
+    part.piece(geo,null,handX+.05,-.214,.145,[1,1,1],angle);
     geo.dispose();
   }
   if(side<0 && ['lanyard','crossbody'].includes(look.outfit)) {

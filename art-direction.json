@@ -110,6 +110,24 @@
       "reference": "https://x.com/yongfook",
       "PROP": "a little honey-brown teddy bear, for Bannerbear",
       "BACKGROUND": "pale pistachio"
+    },
+    {
+      "handle": "caitbhri",
+      "reference": "https://x.com/caitbhri",
+      "PROP": "a pocket-sized bright yellow directory book with tabbed pages and an embossed address-book icon in place of the drink from the source photo, for the Stripe directory she described as the yellow pages",
+      "BACKGROUND": "pale duck-egg blue"
+    },
+    {
+      "handle": "neilhanyd",
+      "reference": "https://www.fintechfestival.sg/pay-it-forward/mentor-neil-han",
+      "PROP": "a miniature dark teal blockchain textbook with three small linked blocks embossed on its cover, for his blockchain textbook",
+      "BACKGROUND": "apricot cream"
+    },
+    {
+      "handle": "jesslozanos",
+      "reference": "https://x.com/jesslozanos",
+      "PROP": "a tiny cream long-haul passenger airplane with blue wings and a coral tail, for her 19-hour flight to Singapore",
+      "BACKGROUND": "pale misty lavender"
     }
   ]
 }

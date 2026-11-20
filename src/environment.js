@@ -202,7 +202,7 @@ function makeWater(T, root) {
   return t => { material.uniforms.time.value = t; };
 }
 
-export function buildEnvironment(T, scene) {
+export function buildEnvironment(T, scene, {shadowSize=1536}={}) {
   const root = new T.Group();
   root.name = 'Palm Hours courtyard';
   scene.add(root);
@@ -254,7 +254,7 @@ export function buildEnvironment(T, scene) {
   sunlight.position.set(-8, 15, 7.8);
   sunlight.target.position.set(0, 0, -0.4);
   sunlight.castShadow = true;
-  sunlight.shadow.mapSize.set(1536, 1536);
+  sunlight.shadow.mapSize.set(shadowSize, shadowSize);
   Object.assign(sunlight.shadow.camera, { left: -15, right: 15, top: 13, bottom: -13, near: 1, far: 43 });
   sunlight.shadow.camera.updateProjectionMatrix();
   sunlight.shadow.normalBias = 0.025;

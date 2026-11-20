@@ -36,10 +36,14 @@ function finishEntry(){
   else if(restoreSeat&&getFocus()&&!sitting)world.takeSeat(null,true);
   restoreSeat=false;
 }
+let invitationUrl=location.pathname.startsWith('/join/')?location.origin+location.pathname:null;
 async function copyInvite(){
-  const response=await fetch('/api/invite',{cache:'no-store'});
-  if(!response.ok)throw new Error('Invitation unavailable');
-  const data=await response.json(),url=new URL(data.path,location.href).href;
+  if(!invitationUrl){
+    const response=await fetch('/api/invite',{cache:'no-store'});
+    if(!response.ok)throw new Error('Invitation unavailable');
+    const data=await response.json();invitationUrl=new URL(data.path,location.href).href;
+  }
+  const url=invitationUrl;
   try{await navigator.clipboard.writeText(url);return {url,copied:true};}catch{return {url,copied:false};}
 }
 party=createPartyUI({residents,onClaim:handle=>room.trigger('claim',{handle}),onRelease:()=>room.trigger('release'),onWave:()=>room.trigger('wave'),
@@ -80,9 +84,10 @@ for(const [i,r] of residents.entries()){
 function expandRoster(expanded) {
   list.classList.toggle('expanded',expanded);
   const button=$('all');button.setAttribute('aria-expanded',String(expanded));
-  button.innerHTML=icon(expanded?'row':'grid')+'<span>'+(expanded?'Show less':'View all 18')+'</span>';
+  button.innerHTML=icon(expanded?'row':'grid')+'<span>'+(expanded?'Show less':'View all '+residents.length)+'</span>';
   if(!expanded)list.scrollLeft=0;
 }
+expandRoster(false);
 $('all').addEventListener('click',()=>expandRoster(!list.classList.contains('expanded')));
 function activeNav(which){$('nav-island').classList.toggle('active',which==='island');$('nav-residents').classList.toggle('active',which==='residents');}
 $('nav-residents').addEventListener('click',()=>{expandRoster(true);activeNav('residents');});

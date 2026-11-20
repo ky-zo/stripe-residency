@@ -168,6 +168,36 @@ const roster = [
     source: 'https://www.bannerbear.com/journey-to-10k-mrr/',
     sources: ['https://www.bannerbear.com/'],
   },
+  {
+    handle: 'caitbhri',
+    name: 'Cait Bahari',
+    shortName: 'Cait',
+    role: 'Stripe residency host',
+    bio: 'Cait helped bring the founders together in Bali. When Stripe launched its business directory, she called it the Yellow Pages. Here it fits in her pocket.',
+    prop: 'Little yellow directory',
+    source: 'https://x.com/caitbhri/status/2069082770731909161',
+    sources: ['https://x.com/caitbhri/status/2115816900710248736'],
+  },
+  {
+    handle: 'neilhanyd',
+    name: 'Neil Han',
+    shortName: 'Neil',
+    role: 'Engineer and author',
+    bio: 'Neil turned the blockchain course he taught at Nanyang Technological University into Mastering Blockchain Scalability. He published the whole textbook online for anyone to read.',
+    prop: 'Pocket blockchain textbook',
+    source: 'https://neilydhan.github.io/Mastering-Blockchain-Scalability/',
+    sources: ['https://x.com/NeilHANYD/status/2104380902168224042', 'https://www.fintechfestival.sg/pay-it-forward/mentor-neil-han'],
+  },
+  {
+    handle: 'jesslozanos',
+    name: 'Jess Lozano Schmitt',
+    shortName: 'Jess',
+    role: 'Stripe residency host',
+    bio: 'Jess worked in aerospace investing at JetBlue. She later posted updates from her 19-hour flight to Singapore, giving the seat an early comfort score of two out of five.',
+    prop: 'Pocket passenger jet',
+    source: 'https://x.com/JessLozanoS/status/2120719788053766192',
+    sources: ['https://x.com/JessLozanoS', 'https://x.com/caitbhri/status/2115816900710248736'],
+  },
 ];
 
 export const residents = roster.map((resident) => ({
