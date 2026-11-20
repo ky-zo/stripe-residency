@@ -1,0 +1,12 @@
+.git
+.vercel
+.studio
+.wrangler
+node_modules
+build
+dist
+.dev.vars*
+.env*
+*.log
+*.local
+.DS_Store

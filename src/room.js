@@ -2,7 +2,7 @@ import { initialBall } from '../shared/ball.js';
 
 const ticketKey='palm-hours.stay.v1';
 export function createRoom(events) {
-  let socket=null,wanted=false,tries=0,retry,heartbeat,offset=0,hasTime=false;
+  let socket=null,wanted=false,tries=0,attempt=0,retry,heartbeat,offset=0,hasTime=false;
   let state={status:'offline',players:[],claims:{},ownId:null,ball:initialBall};
   let ticket;try{ticket=sessionStorage.getItem(ticketKey);}catch{}
   let lastSent=null,lastSendAt=0;
@@ -16,11 +16,28 @@ export function createRoom(events) {
     const next=t-Date.now();
     offset=hasTime?offset*.75+next*.25:next;hasTime=true;
   }
-  function connect(){
+  function reconnect(){
+    tries++;status('reconnecting');
+    retry=setTimeout(connect,Math.min(9000,350*2**Math.min(tries,5))+Math.random()*240);
+  }
+  async function connect(){
     if(!wanted)return;
+    const current=++attempt;
     status(tries?'reconnecting':'connecting');
-    const url=new URL('/live',location.href);url.protocol=url.protocol==='https:'?'wss:':'ws:';
-    const ws=new WebSocket(url);socket=ws;
+    let ws;
+    try{
+      const response=await fetch('/api/connection',{cache:'no-store',signal:AbortSignal.timeout(10000)});
+      if(!response.ok)throw new Error('Room unavailable');
+      const data=await response.json();
+      if(current!==attempt||!wanted)return;
+      const url=new URL(data.url,location.href);
+      if(url.protocol==='https:')url.protocol='wss:';
+      if(url.protocol==='http:')url.protocol='ws:';
+      ws=new WebSocket(url);socket=ws;
+    }catch{
+      if(current===attempt&&wanted)reconnect();
+      return;
+    }
     ws.onopen=()=>{if(ws===socket)send({type:'hello',ticket});};
     ws.onmessage=e=>{
       if(ws!==socket)return;
@@ -47,14 +64,13 @@ export function createRoom(events) {
       socket=null;clearInterval(heartbeat);
       if(!wanted)return;
       if(e.code===4001){wanted=false;status('offline');events.error({code:'session',text:'This player opened the island in another tab.'});return;}
-      tries++;status('reconnecting');
-      retry=setTimeout(connect,Math.min(9000,350*2**Math.min(tries,5))+Math.random()*240);
+      reconnect();
     };
     ws.onerror=()=>{try{ws.close();}catch{}};
   }
   function open(){if(wanted)return;wanted=true;tries=0;connect();}
   function close(){
-    wanted=false;clearTimeout(retry);clearInterval(heartbeat);const old=socket;socket=null;
+    wanted=false;attempt++;clearTimeout(retry);clearInterval(heartbeat);const old=socket;socket=null;
     if(old)try{old.close(1000,'Left the courtyard');}catch{}
     state={...state,players:[],claims:{},ownId:null,status:'offline'};events.state(state);
   }

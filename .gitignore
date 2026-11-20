@@ -9,3 +9,5 @@ dist/
 .dev.vars*
 .env*
 build/
+.vercel/
+.vercel

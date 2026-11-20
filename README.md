@@ -14,6 +14,8 @@ A browser tab receives a private reconnect ticket. A character stays reserved fo
 
 ## Production
 
-`npm run build` creates the website and a ZIP of all 21 GLB figures in `build/island`. The Cloudflare deployment uses `wrangler.jsonc` and the `ISLAND_INVITE` Worker secret. The invitation path is `/join/<ISLAND_INVITE>`. The private Sites entry uses `COURTYARD_INVITATION_URL` to open the same island.
+`npm run build` creates the Vercel website and a ZIP of all 21 GLB figures in `build/island`. The production project is `kyzobuilds/palm-hours`. Vercel serves the site and protects the residency invitation. Its middleware gives an invited browser a one-minute, origin-bound pass to open a WebSocket directly to the Cloudflare room. This also works in browsers that block third-party cookies.
+
+Production uses the same `ISLAND_INVITE` and `ROOM_SIGNING_KEY` secrets on Vercel and Cloudflare. The invitation path is `/join/<ISLAND_INVITE>`. `wrangler.jsonc` configures the room. The private Sites entry opens the shared invitation through `COURTYARD_INVITATION_URL`.
 
 `src/residents.js` contains the profile sources and keepsakes. The GPT ImageGen portraits live in `public/portraits`, with their generation prompts in `art-direction.json`.

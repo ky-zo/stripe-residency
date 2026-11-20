@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { residents } from '../src/residents.js';
 import { SEATS, npcPose } from '../src/island-life.js';
 import { ballAt, colors, initialBall } from '../shared/ball.js';
+import { acceptsRoomPass, hasInvitation, invitationCookie, invitationPage } from '../shared/invitations.js';
 
 const handles=residents.map(r=>r.handle);
 const seatById=id=>SEATS.find(s=>String(s.id)===String(id));
@@ -13,25 +14,24 @@ const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const publicPlayer=p=>({id:p.id,handle:p.handle,color:p.color,x:p.x,z:p.z,yaw:p.yaw,walking:p.walking,at:p.lastMove,seat:p.seat,waveAt:p.waveAt});
 const send=(ws,msg)=>{try{ws.send(JSON.stringify(msg));}catch{}};
 const localHost=url=>['127.0.0.1','localhost','[::1]'].includes(url.hostname);
-function gatedPage(){
-  return new Response('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Palm Hours</title><body style="margin:12vh 10vw;background:#faf8f1;color:#293e2e;font:18px/1.5 system-ui"><h1 style="font:64px Georgia;margin-bottom:12px">Palm Hours</h1><p>Open the residency invitation link to enter the island.</p></body></html>',{status:403,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'private, no-store','X-Robots-Tag':'noindex, nofollow'}});
-}
 export default {
   async fetch(req,env){
     const url=new URL(req.url);
     const local=env.LOCAL_DEVELOPMENT==='true'&&localHost(url);
     const key=env.ISLAND_INVITE;
     const join=key && url.pathname==='/join/'+key;
-    const member=key && (req.headers.get('Cookie')||'').split(/;\s*/).includes('__Host-palm_hours='+key);
+    const member=hasInvitation(req,key);
     if(url.pathname==='/robots.txt')return new Response('User-agent: *\nDisallow: /\n');
-    if(!local&&!join&&!member)return gatedPage();
     if(url.pathname==='/live'){
       const origin=req.headers.get('Origin');
-      if(origin && origin!==url.origin && !(local && localHost(new URL(origin))))return new Response('Origin does not match the island.',{status:403});
+      const direct=(!origin||origin===url.origin||local&&/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin))&&(local||member);
+      if(!direct && !await acceptsRoomPass(url.searchParams.get('admit'),origin,env.ROOM_SIGNING_KEY))return invitationPage();
       if(req.headers.get('Upgrade')?.toLowerCase()!=='websocket')return new Response('WebSocket required',{status:426});
       return env.ISLAND.getByName('palm-hours-residency').fetch(req);
     }
+    if(!local&&!join&&!member)return invitationPage();
     if(req.method!=='GET'&&req.method!=='HEAD')return new Response('Method unavailable',{status:405});
+    if(url.pathname==='/api/connection')return Response.json({url:'/live'},{headers:{'Cache-Control':'private, no-store'}});
     if(url.pathname==='/api/invite'){
       // A local Vite preview uses a same-origin WebSocket proxy.
       return Response.json({path:local?'/':'/join/'+key},{headers:{'Cache-Control':'private, no-store'}});
@@ -42,7 +42,7 @@ export default {
     response.headers.set('Referrer-Policy','no-referrer');
     response.headers.set('X-Robots-Tag','noindex, nofollow');
     response.headers.set('X-Content-Type-Options','nosniff');
-    if(join)response.headers.append('Set-Cookie','__Host-palm_hours='+key+'; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=31536000');
+    if(join)response.headers.append('Set-Cookie',invitationCookie(key));
     if(join||file.pathname==='/index.html')response.headers.set('Cache-Control','private, no-store');
     return response;
   }
